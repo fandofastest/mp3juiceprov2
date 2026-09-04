@@ -1,0 +1,66 @@
+import { NextRequest } from "next/server";
+import { initApi, successResponse, errorResponse } from "../../../lib/api-helper";
+import { ProviderFactory } from "@headless/providers";
+import { AnalyticsEvent, SystemSettings } from "@headless/database";
+import { verifyAccessToken } from "@headless/auth";
+
+export async function GET(req: NextRequest) {
+  try {
+    await initApi();
+    const { searchParams } = new URL(req.url);
+    const query = searchParams.get("q") || "";
+    const limit = parseInt(searchParams.get("limit") || "10");
+    const providerName = searchParams.get("provider") || "mock";
+
+    if (!query) {
+      return errorResponse("Search query is required", 400);
+    }
+
+    const provider = ProviderFactory.getProvider(providerName);
+
+    // Dynamically inject YouTube API Key from Settings database
+    if (providerName === "youtube") {
+      const settings = await SystemSettings.findOne();
+      if (settings && settings.apiKeys) {
+        const apiKey = settings.apiKeys.get("youtube_api_key");
+        if (apiKey && "setApiKey" in provider) {
+          (provider as any).setApiKey(apiKey);
+        }
+      }
+    }
+
+    let results;
+    try {
+      results = await provider.search(query, limit);
+    } catch (e) {
+      console.error("Provider search failed, using fallback:", e);
+      results = { tracks: [], albums: [], artists: [] };
+    }
+
+    if ((!results || !results.tracks || results.tracks.length === 0) && providerName === "youtube") {
+      console.log("YouTube search returned 0 results. Falling back to Mock music provider.");
+      const mockProvider = ProviderFactory.getProvider("mock");
+      results = await mockProvider.search(query, limit);
+    }
+
+    // Track search event in analytics asynchronously
+    const authHeader = req.headers.get("Authorization");
+    let userId: string | undefined;
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      const payload = verifyAccessToken(authHeader.substring(7));
+      if (payload) {
+        userId = payload.userId;
+      }
+    }
+
+    AnalyticsEvent.create({
+      eventType: "Search",
+      userId,
+      metadata: { query, provider: providerName, resultCount: results.tracks.length },
+    }).catch(err => console.error("Analytics error:", err));
+
+    return successResponse(results);
+  } catch (error: any) {
+    return errorResponse(error.message || "Internal server error", 500);
+  }
+}
