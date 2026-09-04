@@ -1,4 +1,14 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
+export function getApiBaseUrl(): string {
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL;
+  }
+  if (typeof window !== "undefined") {
+    const protocol = window.location.protocol;
+    const hostname = window.location.hostname;
+    return `${protocol}//${hostname}:3001/api`;
+  }
+  return process.env.API_BASE_URL || "http://localhost:3001/api";
+}
 
 export async function apiRequest<T = any>(
   path: string,
@@ -15,7 +25,9 @@ export async function apiRequest<T = any>(
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_BASE}${path}`, {
+  const apiBase = getApiBaseUrl();
+
+  const response = await fetch(`${apiBase}${path}`, {
     method,
     headers,
     body: body ? JSON.stringify(body) : undefined,

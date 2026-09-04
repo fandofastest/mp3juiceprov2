@@ -1,7 +1,20 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.getApiBaseUrl = getApiBaseUrl;
 exports.apiRequest = apiRequest;
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
+
+function getApiBaseUrl() {
+    if (process.env.NEXT_PUBLIC_API_URL) {
+        return process.env.NEXT_PUBLIC_API_URL;
+    }
+    if (typeof window !== "undefined") {
+        const protocol = window.location.protocol;
+        const hostname = window.location.hostname;
+        return `${protocol}//${hostname}:3001/api`;
+    }
+    return process.env.API_BASE_URL || "http://localhost:3001/api";
+}
+
 async function apiRequest(path, method = "GET", body) {
     const token = typeof window !== "undefined" ? localStorage.getItem("admin_token") : null;
     const headers = {
@@ -10,7 +23,8 @@ async function apiRequest(path, method = "GET", body) {
     if (token) {
         headers["Authorization"] = `Bearer ${token}`;
     }
-    const response = await fetch(`${API_BASE}${path}`, {
+    const apiBase = getApiBaseUrl();
+    const response = await fetch(`${apiBase}${path}`, {
         method,
         headers,
         body: body ? JSON.stringify(body) : undefined,
@@ -21,4 +35,3 @@ async function apiRequest(path, method = "GET", body) {
     }
     return result.data;
 }
-//# sourceMappingURL=api-client.js.map
