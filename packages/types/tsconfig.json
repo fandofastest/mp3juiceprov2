@@ -9,7 +9,16 @@
     "resolveJsonModule": true,
     "declaration": true,
     "outDir": "./dist",
-    "rootDir": "./src"
+    "rootDir": "./src",
+    "baseUrl": ".",
+    "paths": {
+      "@headless/types": ["../../packages/types/dist/index.d.ts"],
+      "@headless/utils": ["../../packages/utils/dist/index.d.ts"],
+      "@headless/database": ["../../packages/database/dist/index.d.ts"],
+      "@headless/auth": ["../../packages/auth/dist/index.d.ts"],
+      "@headless/providers": ["../../packages/providers/dist/index.d.ts"],
+      "@headless/ui": ["../../packages/ui/dist/index.d.ts"]
+    }
   },
   "include": ["src/**/*"]
 }

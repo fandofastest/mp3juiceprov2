@@ -144,7 +144,6 @@ export interface IAppConfigDocument extends Document {
         bannerAdUnitId?: string;
         interstitialAdUnitId?: string;
         interSplashAdUnitId?: string;
-        openAdUnitId?: string;
         rewardedAdUnitId?: string;
         nativeAdUnitId?: string;
     };
@@ -153,7 +152,6 @@ export interface IAppConfigDocument extends Document {
         bannerAdUnitId?: string;
         interstitialAdUnitId?: string;
         interSplashAdUnitId?: string;
-        openAdUnitId?: string;
         rewardedAdUnitId?: string;
         nativeAdUnitId?: string;
     };
@@ -161,7 +159,6 @@ export interface IAppConfigDocument extends Document {
         bannerEnabled: boolean;
         interstitialEnabled: boolean;
         interSplashEnabled: boolean;
-        openAdsEnabled?: boolean;
         rewardedEnabled: boolean;
         nativeEnabled: boolean;
         interstitialInterval: number;

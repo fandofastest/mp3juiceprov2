@@ -19,7 +19,13 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@headless/types": ["../../packages/types/src/index.ts"],
+      "@headless/utils": ["../../packages/utils/src/index.ts"],
+      "@headless/database": ["../../packages/database/src/index.ts"],
+      "@headless/auth": ["../../packages/auth/src/index.ts"],
+      "@headless/providers": ["../../packages/providers/src/index.ts"],
+      "@headless/ui": ["../../packages/ui/src/index.ts"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],

@@ -11,6 +11,10 @@ build/
 dist/
 *.tsbuildinfo
 
+# Keys & Secrets
+*.key
+*.pem
+
 # Environment Variables
 .env
 .env*.local

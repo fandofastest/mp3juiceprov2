@@ -27,19 +27,19 @@ export declare const RegisterInputSchema: z.ZodObject<{
     country: z.ZodOptional<z.ZodString>;
     language: z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
+    username: string;
     displayName: string;
     email: string;
     password: string;
-    username: string;
-    language?: string | undefined;
     country?: string | undefined;
+    language?: string | undefined;
 }, {
+    username: string;
     displayName: string;
     email: string;
     password: string;
-    username: string;
-    language?: string | undefined;
     country?: string | undefined;
+    language?: string | undefined;
 }>;
 export declare const LoginInputSchema: z.ZodObject<{
     email: z.ZodString;
@@ -80,18 +80,18 @@ export declare const UpdateProfileInputSchema: z.ZodObject<{
     theme: z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
     displayName?: string | undefined;
-    theme?: string | undefined;
-    language?: string | undefined;
     country?: string | undefined;
+    language?: string | undefined;
     bio?: string | undefined;
     avatar?: string | undefined;
+    theme?: string | undefined;
 }, {
     displayName?: string | undefined;
-    theme?: string | undefined;
-    language?: string | undefined;
     country?: string | undefined;
+    language?: string | undefined;
     bio?: string | undefined;
     avatar?: string | undefined;
+    theme?: string | undefined;
 }>;
 export interface Category {
     id: string;
@@ -117,24 +117,24 @@ export declare const CategoryInputSchema: z.ZodObject<{
     tracks: z.ZodOptional<z.ZodDefault<z.ZodArray<z.ZodAny, "many">>>;
 }, "strip", z.ZodTypeAny, {
     title: string;
+    slug: string;
     sortOrder: number;
     enabled: boolean;
-    slug: string;
-    color?: string | undefined;
-    tracks?: any[] | undefined;
     description?: string | undefined;
     icon?: string | undefined;
     cover?: string | undefined;
+    color?: string | undefined;
+    tracks?: any[] | undefined;
 }, {
     title: string;
     slug: string;
+    description?: string | undefined;
+    icon?: string | undefined;
+    cover?: string | undefined;
     color?: string | undefined;
     sortOrder?: number | undefined;
     enabled?: boolean | undefined;
     tracks?: any[] | undefined;
-    description?: string | undefined;
-    icon?: string | undefined;
-    cover?: string | undefined;
 }>;
 export declare const GENRES: readonly ["Pop", "Rock", "Jazz", "Hip Hop", "EDM", "Classical", "Country", "Metal", "R&B", "KPop", "Indie", "Lofi", "Instrumental", "Acoustic", "Custom"];
 export declare const MOODS: readonly ["Workout", "Focus", "Sleep", "Study", "Party", "Relax", "Morning", "Night", "Travel", "Driving", "Gaming", "Coding", "Meditation", "Custom"];
@@ -176,10 +176,10 @@ export declare const BannerInputSchema: z.ZodObject<{
     sortOrder: z.ZodDefault<z.ZodNumber>;
 }, "strip", z.ZodTypeAny, {
     title: string;
-    image: string;
-    targetType: "url" | "category" | "genre" | "playlist" | "artist" | "album" | "song";
     sortOrder: number;
     enabled: boolean;
+    image: string;
+    targetType: "url" | "category" | "genre" | "playlist" | "artist" | "album" | "song";
     subtitle?: string | undefined;
     buttonText?: string | undefined;
     buttonColor?: string | undefined;
@@ -188,12 +188,12 @@ export declare const BannerInputSchema: z.ZodObject<{
     title: string;
     image: string;
     targetType: "url" | "category" | "genre" | "playlist" | "artist" | "album" | "song";
+    sortOrder?: number | undefined;
+    enabled?: boolean | undefined;
     subtitle?: string | undefined;
     buttonText?: string | undefined;
     buttonColor?: string | undefined;
     targetId?: string | undefined;
-    sortOrder?: number | undefined;
-    enabled?: boolean | undefined;
 }>;
 export type SectionType = "search" | "playlist" | "artist" | "album" | "category" | "featured" | "recommendation" | "history" | "favorites" | "manual" | "banner";
 export interface HomeSection {
@@ -227,32 +227,32 @@ export declare const HomeSectionInputSchema: z.ZodObject<{
     providerConfig: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodAny>>;
     tracks: z.ZodOptional<z.ZodArray<z.ZodAny, "many">>;
 }, "strip", z.ZodTypeAny, {
-    type: "search" | "category" | "playlist" | "artist" | "album" | "featured" | "recommendation" | "manual" | "banner" | "history" | "favorites";
+    type: "category" | "playlist" | "artist" | "album" | "search" | "featured" | "recommendation" | "history" | "favorites" | "manual" | "banner";
     title: string;
     sortOrder: number;
     enabled: boolean;
-    layout: "carousel" | "grid" | "list" | "banner";
+    layout: "banner" | "carousel" | "grid" | "list";
     limit: number;
     provider: string;
-    subtitle?: string | undefined;
-    query?: string | undefined;
-    tracks?: any[] | undefined;
     icon?: string | undefined;
     cover?: string | undefined;
+    tracks?: any[] | undefined;
+    subtitle?: string | undefined;
+    query?: string | undefined;
     providerConfig?: Record<string, any> | undefined;
 }, {
-    type: "search" | "category" | "playlist" | "artist" | "album" | "featured" | "recommendation" | "manual" | "banner" | "history" | "favorites";
+    type: "category" | "playlist" | "artist" | "album" | "search" | "featured" | "recommendation" | "history" | "favorites" | "manual" | "banner";
     title: string;
-    layout: "carousel" | "grid" | "list" | "banner";
-    subtitle?: string | undefined;
+    layout: "banner" | "carousel" | "grid" | "list";
+    icon?: string | undefined;
+    cover?: string | undefined;
     sortOrder?: number | undefined;
     enabled?: boolean | undefined;
+    tracks?: any[] | undefined;
+    subtitle?: string | undefined;
     query?: string | undefined;
     limit?: number | undefined;
     provider?: string | undefined;
-    tracks?: any[] | undefined;
-    icon?: string | undefined;
-    cover?: string | undefined;
     providerConfig?: Record<string, any> | undefined;
 }>;
 export interface NormalizedTrack {
@@ -323,9 +323,9 @@ export declare const PlaylistInputSchema: z.ZodObject<{
     cover?: string | undefined;
 }, {
     title: string;
-    tracks?: any[] | undefined;
     description?: string | undefined;
     cover?: string | undefined;
+    tracks?: any[] | undefined;
     isPublic?: boolean | undefined;
     isCollaborative?: boolean | undefined;
     isPinned?: boolean | undefined;
@@ -360,12 +360,12 @@ export declare const SystemSettingsInputSchema: z.ZodObject<{
     minimumAppVersion: z.ZodString;
     apiKeys: z.ZodDefault<z.ZodRecord<z.ZodString, z.ZodString>>;
 }, "strip", z.ZodTypeAny, {
+    country: string;
+    language: string;
+    theme: "dark" | "light" | "system";
     appName: string;
     primaryColor: string;
     secondaryColor: string;
-    theme: "dark" | "light" | "system";
-    language: string;
-    country: string;
     searchLimit: number;
     cacheTtl: number;
     maintenanceMode: boolean;
@@ -374,19 +374,19 @@ export declare const SystemSettingsInputSchema: z.ZodObject<{
     logo?: string | undefined;
     darkLogo?: string | undefined;
 }, {
+    country: string;
+    language: string;
+    theme: "dark" | "light" | "system";
     appName: string;
     primaryColor: string;
     secondaryColor: string;
-    theme: "dark" | "light" | "system";
-    language: string;
-    country: string;
     searchLimit: number;
     cacheTtl: number;
     maintenanceMode: boolean;
     minimumAppVersion: string;
-    apiKeys?: Record<string, string> | undefined;
     logo?: string | undefined;
     darkLogo?: string | undefined;
+    apiKeys?: Record<string, string> | undefined;
 }>;
 export interface ApiResponse<T = any> {
     success: true;
@@ -406,7 +406,6 @@ export interface AppConfig {
         bannerAdUnitId?: string;
         interstitialAdUnitId?: string;
         interSplashAdUnitId?: string;
-        openAdUnitId?: string;
         rewardedAdUnitId?: string;
         nativeAdUnitId?: string;
     };
@@ -415,7 +414,6 @@ export interface AppConfig {
         bannerAdUnitId?: string;
         interstitialAdUnitId?: string;
         interSplashAdUnitId?: string;
-        openAdUnitId?: string;
         rewardedAdUnitId?: string;
         nativeAdUnitId?: string;
     };
@@ -423,7 +421,6 @@ export interface AppConfig {
         bannerEnabled: boolean;
         interstitialEnabled: boolean;
         interSplashEnabled: boolean;
-        openAdsEnabled?: boolean;
         rewardedEnabled: boolean;
         nativeEnabled: boolean;
         interstitialInterval: number;
@@ -450,7 +447,6 @@ export declare const AppConfigInputSchema: z.ZodObject<{
         bannerAdUnitId: z.ZodOptional<z.ZodString>;
         interstitialAdUnitId: z.ZodOptional<z.ZodString>;
         interSplashAdUnitId: z.ZodOptional<z.ZodString>;
-        openAdUnitId: z.ZodOptional<z.ZodString>;
         rewardedAdUnitId: z.ZodOptional<z.ZodString>;
         nativeAdUnitId: z.ZodOptional<z.ZodString>;
     }, "strip", z.ZodTypeAny, {
@@ -458,7 +454,6 @@ export declare const AppConfigInputSchema: z.ZodObject<{
         bannerAdUnitId?: string | undefined;
         interstitialAdUnitId?: string | undefined;
         interSplashAdUnitId?: string | undefined;
-        openAdUnitId?: string | undefined;
         rewardedAdUnitId?: string | undefined;
         nativeAdUnitId?: string | undefined;
     }, {
@@ -466,7 +461,6 @@ export declare const AppConfigInputSchema: z.ZodObject<{
         bannerAdUnitId?: string | undefined;
         interstitialAdUnitId?: string | undefined;
         interSplashAdUnitId?: string | undefined;
-        openAdUnitId?: string | undefined;
         rewardedAdUnitId?: string | undefined;
         nativeAdUnitId?: string | undefined;
     }>>;
@@ -475,14 +469,12 @@ export declare const AppConfigInputSchema: z.ZodObject<{
         bannerAdUnitId: z.ZodOptional<z.ZodString>;
         interstitialAdUnitId: z.ZodOptional<z.ZodString>;
         interSplashAdUnitId: z.ZodOptional<z.ZodString>;
-        openAdUnitId: z.ZodOptional<z.ZodString>;
         rewardedAdUnitId: z.ZodOptional<z.ZodString>;
         nativeAdUnitId: z.ZodOptional<z.ZodString>;
     }, "strip", z.ZodTypeAny, {
         bannerAdUnitId?: string | undefined;
         interstitialAdUnitId?: string | undefined;
         interSplashAdUnitId?: string | undefined;
-        openAdUnitId?: string | undefined;
         rewardedAdUnitId?: string | undefined;
         nativeAdUnitId?: string | undefined;
         sdkKey?: string | undefined;
@@ -490,7 +482,6 @@ export declare const AppConfigInputSchema: z.ZodObject<{
         bannerAdUnitId?: string | undefined;
         interstitialAdUnitId?: string | undefined;
         interSplashAdUnitId?: string | undefined;
-        openAdUnitId?: string | undefined;
         rewardedAdUnitId?: string | undefined;
         nativeAdUnitId?: string | undefined;
         sdkKey?: string | undefined;
@@ -499,29 +490,26 @@ export declare const AppConfigInputSchema: z.ZodObject<{
         bannerEnabled: z.ZodDefault<z.ZodBoolean>;
         interstitialEnabled: z.ZodDefault<z.ZodBoolean>;
         interSplashEnabled: z.ZodDefault<z.ZodBoolean>;
-        openAdsEnabled: z.ZodOptional<z.ZodDefault<z.ZodBoolean>>;
         rewardedEnabled: z.ZodDefault<z.ZodBoolean>;
         nativeEnabled: z.ZodDefault<z.ZodBoolean>;
         interstitialInterval: z.ZodDefault<z.ZodNumber>;
         adProvider: z.ZodDefault<z.ZodEnum<["admob", "applovin", "none"]>>;
     }, "strip", z.ZodTypeAny, {
-        adProvider: "none" | "admob" | "applovin";
         bannerEnabled: boolean;
         interstitialEnabled: boolean;
         interSplashEnabled: boolean;
         rewardedEnabled: boolean;
         nativeEnabled: boolean;
         interstitialInterval: number;
-        openAdsEnabled?: boolean | undefined;
+        adProvider: "admob" | "applovin" | "none";
     }, {
-        adProvider?: "none" | "admob" | "applovin" | undefined;
         bannerEnabled?: boolean | undefined;
         interstitialEnabled?: boolean | undefined;
         interSplashEnabled?: boolean | undefined;
-        openAdsEnabled?: boolean | undefined;
         rewardedEnabled?: boolean | undefined;
         nativeEnabled?: boolean | undefined;
         interstitialInterval?: number | undefined;
+        adProvider?: "admob" | "applovin" | "none" | undefined;
     }>>;
     promoBanner: z.ZodDefault<z.ZodObject<{
         enabled: z.ZodDefault<z.ZodBoolean>;
@@ -532,8 +520,8 @@ export declare const AppConfigInputSchema: z.ZodObject<{
         image?: string | undefined;
         targetUrl?: string | undefined;
     }, {
-        image?: string | undefined;
         enabled?: boolean | undefined;
+        image?: string | undefined;
         targetUrl?: string | undefined;
     }>>;
     appUpdate: z.ZodDefault<z.ZodObject<{
@@ -551,14 +539,11 @@ export declare const AppConfigInputSchema: z.ZodObject<{
     }>>;
     safeMode: z.ZodDefault<z.ZodBoolean>;
 }, "strip", z.ZodTypeAny, {
-    packageName: string;
-    safeMode: boolean;
     admob: {
         appId?: string | undefined;
         bannerAdUnitId?: string | undefined;
         interstitialAdUnitId?: string | undefined;
         interSplashAdUnitId?: string | undefined;
-        openAdUnitId?: string | undefined;
         rewardedAdUnitId?: string | undefined;
         nativeAdUnitId?: string | undefined;
     };
@@ -566,20 +551,19 @@ export declare const AppConfigInputSchema: z.ZodObject<{
         bannerAdUnitId?: string | undefined;
         interstitialAdUnitId?: string | undefined;
         interSplashAdUnitId?: string | undefined;
-        openAdUnitId?: string | undefined;
         rewardedAdUnitId?: string | undefined;
         nativeAdUnitId?: string | undefined;
         sdkKey?: string | undefined;
     };
+    packageName: string;
     ads: {
-        adProvider: "none" | "admob" | "applovin";
         bannerEnabled: boolean;
         interstitialEnabled: boolean;
         interSplashEnabled: boolean;
         rewardedEnabled: boolean;
         nativeEnabled: boolean;
         interstitialInterval: number;
-        openAdsEnabled?: boolean | undefined;
+        adProvider: "admob" | "applovin" | "none";
     };
     promoBanner: {
         enabled: boolean;
@@ -591,15 +575,14 @@ export declare const AppConfigInputSchema: z.ZodObject<{
         minimumVersion?: string | undefined;
         updateUrl?: string | undefined;
     };
+    safeMode: boolean;
 }, {
     packageName: string;
-    safeMode?: boolean | undefined;
     admob?: {
         appId?: string | undefined;
         bannerAdUnitId?: string | undefined;
         interstitialAdUnitId?: string | undefined;
         interSplashAdUnitId?: string | undefined;
-        openAdUnitId?: string | undefined;
         rewardedAdUnitId?: string | undefined;
         nativeAdUnitId?: string | undefined;
     } | undefined;
@@ -607,24 +590,22 @@ export declare const AppConfigInputSchema: z.ZodObject<{
         bannerAdUnitId?: string | undefined;
         interstitialAdUnitId?: string | undefined;
         interSplashAdUnitId?: string | undefined;
-        openAdUnitId?: string | undefined;
         rewardedAdUnitId?: string | undefined;
         nativeAdUnitId?: string | undefined;
         sdkKey?: string | undefined;
     } | undefined;
     ads?: {
-        adProvider?: "none" | "admob" | "applovin" | undefined;
         bannerEnabled?: boolean | undefined;
         interstitialEnabled?: boolean | undefined;
         interSplashEnabled?: boolean | undefined;
-        openAdsEnabled?: boolean | undefined;
         rewardedEnabled?: boolean | undefined;
         nativeEnabled?: boolean | undefined;
         interstitialInterval?: number | undefined;
+        adProvider?: "admob" | "applovin" | "none" | undefined;
     } | undefined;
     promoBanner?: {
-        image?: string | undefined;
         enabled?: boolean | undefined;
+        image?: string | undefined;
         targetUrl?: string | undefined;
     } | undefined;
     appUpdate?: {
@@ -632,5 +613,6 @@ export declare const AppConfigInputSchema: z.ZodObject<{
         minimumVersion?: string | undefined;
         updateUrl?: string | undefined;
     } | undefined;
+    safeMode?: boolean | undefined;
 }>;
 //# sourceMappingURL=index.d.ts.map
