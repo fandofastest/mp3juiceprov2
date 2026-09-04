@@ -7,12 +7,7 @@ function getApiBaseUrl() {
     if (process.env.NEXT_PUBLIC_API_URL) {
         return process.env.NEXT_PUBLIC_API_URL;
     }
-    if (typeof window !== "undefined") {
-        const protocol = window.location.protocol;
-        const hostname = window.location.hostname;
-        return `${protocol}//${hostname}:3001/api`;
-    }
-    return process.env.API_BASE_URL || "http://localhost:3001/api";
+    return "https://juiceproapi.fando.id/api";
 }
 
 async function apiRequest(path, method = "GET", body) {

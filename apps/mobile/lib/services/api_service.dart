@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class ApiService {
-  static const String baseUrl = 'https://mp3juicepro-api.vercel.app/api';
+  static const String baseUrl = 'https://juiceproapi.fando.id/api';
   static const String packageName = 'com.mp3juice.mp3juicepro';
   static const String jamendoClientId = '87c44b11';
   static const String appConfigUrl = 'https://newconfig-bmuj.vercel.app/api/config/com.mp3juice.mp3juicepro?apiKey=rc_6f5fb781ff3ee02b4698403dbae4020c2b0231b9fb5b0b3d';
