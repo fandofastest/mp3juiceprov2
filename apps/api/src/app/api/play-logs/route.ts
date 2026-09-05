@@ -1,6 +1,13 @@
 import { NextRequest } from "next/server";
 import { initApi, successResponse, errorResponse, authenticateRequest, authorizeRoles } from "../../../lib/api-helper";
-import { PlayLog } from "@headless/database";
+import { PlayLog as ImportedPlayLog, PlayLogSchema } from "@headless/database";
+import mongoose from "mongoose";
+
+const getPlayLogModel = () => {
+  if (mongoose.models.PlayLog) return mongoose.models.PlayLog;
+  if (ImportedPlayLog) return ImportedPlayLog;
+  return mongoose.model("PlayLog", PlayLogSchema);
+};
 
 export async function GET(req: NextRequest) {
   try {
@@ -30,13 +37,28 @@ export async function GET(req: NextRequest) {
       query.packageName = packageName;
     }
 
-    const total = await PlayLog.countDocuments(query);
+    const PlayLogModel = getPlayLogModel();
     const skip = (page - 1) * limit;
 
-    const rawLogs = await PlayLog.find(query)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit);
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    // Parallel execution of pagination and summary queries with lean optimization
+    const [total, rawLogs, totalHits, todayHits, uniqueTracks, uniqueApps] = await Promise.all([
+      PlayLogModel.countDocuments(query),
+      PlayLogModel.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      PlayLogModel.estimatedDocumentCount().catch(() => PlayLogModel.countDocuments()),
+      PlayLogModel.countDocuments({ createdAt: { $gte: startOfToday } }),
+      PlayLogModel.distinct("vid", { createdAt: { $gte: thirtyDaysAgo } }).catch(() => []),
+      PlayLogModel.distinct("packageName").catch(() => []),
+    ]);
 
     const logs = (rawLogs || []).map((log: any) => ({
       id: log._id ? log._id.toString() : "",
@@ -50,16 +72,6 @@ export async function GET(req: NextRequest) {
       userAgent: log.userAgent || "Unknown Client",
       createdAt: log.createdAt || new Date(),
     }));
-
-    // Calculate Summary Stats
-    const totalHits = await PlayLog.countDocuments();
-    
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
-    const todayHits = await PlayLog.countDocuments({ createdAt: { $gte: startOfToday } });
-
-    const uniqueTracks = await PlayLog.distinct("vid").catch(() => []);
-    const uniqueApps = await PlayLog.distinct("packageName").catch(() => []);
 
     return successResponse({
       logs,

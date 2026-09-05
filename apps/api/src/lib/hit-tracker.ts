@@ -1,10 +1,11 @@
 import { NextRequest } from "next/server";
-import { AppHitStat as ImportedAppHitStat } from "@headless/database";
+import { AppHitStat as ImportedAppHitStat, AppHitStatSchema } from "@headless/database";
 import mongoose from "mongoose";
 
 const getAppHitStatModel = () => {
+  if (mongoose.models.AppHitStat) return mongoose.models.AppHitStat;
   if (ImportedAppHitStat) return ImportedAppHitStat;
-  return mongoose.models.AppHitStat || mongoose.model("AppHitStat");
+  return mongoose.model("AppHitStat", AppHitStatSchema);
 };
 
 export function trackAppHit(req: NextRequest, endpointName: string) {

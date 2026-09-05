@@ -1,11 +1,12 @@
 import { NextRequest } from "next/server";
 import { initApi, successResponse, errorResponse, authenticateRequest, authorizeRoles } from "../../../../lib/api-helper";
-import { AppHitStat as ImportedAppHitStat, AppConfig } from "@headless/database";
+import { AppHitStat as ImportedAppHitStat, AppHitStatSchema, AppConfig } from "@headless/database";
 import mongoose from "mongoose";
 
 const getAppHitStatModel = () => {
+  if (mongoose.models.AppHitStat) return mongoose.models.AppHitStat;
   if (ImportedAppHitStat) return ImportedAppHitStat;
-  return mongoose.models.AppHitStat || mongoose.model("AppHitStat");
+  return mongoose.model("AppHitStat", AppHitStatSchema);
 };
 
 export async function GET(req: NextRequest) {

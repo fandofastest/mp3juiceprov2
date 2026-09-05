@@ -462,7 +462,7 @@ export interface IPlayLogDocument extends Document {
   createdAt: Date;
 }
 
-const PlayLogSchema = new Schema<IPlayLogDocument>(
+export const PlayLogSchema = new Schema<IPlayLogDocument>(
   {
     vid: { type: String, required: true, index: true },
     title: { type: String },
@@ -476,6 +476,10 @@ const PlayLogSchema = new Schema<IPlayLogDocument>(
   { timestamps: { createdAt: true, updatedAt: false } }
 );
 
+PlayLogSchema.index({ createdAt: -1 });
+PlayLogSchema.index({ packageName: 1, createdAt: -1 });
+PlayLogSchema.index({ vid: 1, createdAt: -1 });
+
 // --- APP HIT STAT SCHEMA (FOR AGGREGATED DAILY APP API HITS) ---
 export interface IAppHitStatDocument extends Document {
   packageName: string;
@@ -487,7 +491,7 @@ export interface IAppHitStatDocument extends Document {
   updatedAt: Date;
 }
 
-const AppHitStatSchema = new Schema<IAppHitStatDocument>(
+export const AppHitStatSchema = new Schema<IAppHitStatDocument>(
   {
     packageName: { type: String, required: true, index: true },
     date: { type: String, required: true, index: true },
