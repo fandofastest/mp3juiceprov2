@@ -3,10 +3,10 @@ import { MockMusicProvider } from "./MockMusicProvider";
 import { YoutubeMusicProvider } from "./YoutubeMusicProvider";
 import { LocalMusicProvider } from "./LocalMusicProvider";
 
-export * from "./MusicProvider.js";
-export * from "./MockMusicProvider.js";
-export * from "./YoutubeMusicProvider.js";
-export * from "./LocalMusicProvider.js";
+export * from "./MusicProvider";
+export * from "./MockMusicProvider";
+export * from "./YoutubeMusicProvider";
+export * from "./LocalMusicProvider";
 
 export class ProviderFactory {
   private static providers: Record<string, MusicProvider> = {

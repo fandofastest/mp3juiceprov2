@@ -1,12 +1,5 @@
 import { NextRequest } from "next/server";
-import { AppHitStat as ImportedAppHitStat, AppHitStatSchema } from "@headless/database";
-import mongoose from "mongoose";
-
-const getAppHitStatModel = () => {
-  if (mongoose.models.AppHitStat) return mongoose.models.AppHitStat;
-  if (ImportedAppHitStat) return ImportedAppHitStat;
-  return mongoose.model("AppHitStat", AppHitStatSchema);
-};
+import { AppHitStat } from "@headless/database";
 
 export function trackAppHit(req: NextRequest, endpointName: string) {
   try {
@@ -20,11 +13,10 @@ export function trackAppHit(req: NextRequest, endpointName: string) {
     const today = new Date().toISOString().split("T")[0];
     const cleanEndpoint = endpointName.replace(/^\/+/, "").replace(/\//g, "_") || "api";
 
-    const AppHitStatModel = getAppHitStatModel();
-    if (!AppHitStatModel) return;
+    if (!AppHitStat) return;
 
     // Asynchronous non-blocking update
-    AppHitStatModel.updateOne(
+    AppHitStat.updateOne(
       { packageName, date: today },
       {
         $inc: {
