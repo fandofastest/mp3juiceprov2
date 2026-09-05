@@ -1,6 +1,12 @@
 import { NextRequest } from "next/server";
 import { initApi, successResponse, errorResponse, authenticateRequest, authorizeRoles } from "../../../../lib/api-helper";
-import { AppHitStat, AppConfig } from "@headless/database";
+import { AppHitStat as ImportedAppHitStat, AppConfig } from "@headless/database";
+import mongoose from "mongoose";
+
+const getAppHitStatModel = () => {
+  if (ImportedAppHitStat) return ImportedAppHitStat;
+  return mongoose.models.AppHitStat || mongoose.model("AppHitStat");
+};
 
 export async function GET(req: NextRequest) {
   try {
@@ -26,7 +32,8 @@ export async function GET(req: NextRequest) {
     }
 
     // 1. Get all hit stats within range
-    const rawStats = await AppHitStat.find(matchQuery).sort({ date: 1 });
+    const AppHitStatModel = getAppHitStatModel();
+    const rawStats = await AppHitStatModel.find(matchQuery).sort({ date: 1 });
 
     // 2. Total platform hits in range
     const totalHits = rawStats.reduce((sum, item) => sum + (item.totalHits || 0), 0);

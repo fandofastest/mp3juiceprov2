@@ -1,25 +1,8 @@
 import mongoose from "mongoose";
 import { Logger } from "@headless/utils";
 
-export {
-  User,
-  HomeSection,
-  Category,
-  Banner,
-  Playlist,
-  Favorite,
-  History,
-  AnalyticsEvent,
-  AuditLog,
-  SystemSettings,
-  Notification,
-  Track,
-  AppConfig,
-  PlayLog,
-  AppHitStat,
-} from "./schemas.js";
-export * from "./schemas.js";
-export * from "./seed.js";
+export * from "./schemas";
+export * from "./seed";
 
 let isConnected = false;
 
