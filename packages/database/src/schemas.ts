@@ -502,13 +502,6 @@ const AppHitStatSchema = new Schema<IAppHitStatDocument>(
 AppHitStatSchema.index({ packageName: 1, date: 1 }, { unique: true });
 
 // Export Mongoose Models
-if (mongoose.models.Category) delete mongoose.models.Category;
-if (mongoose.models.History) delete mongoose.models.History;
-if (mongoose.models.HomeSection) delete mongoose.models.HomeSection;
-if (mongoose.models.AppConfig) delete mongoose.models.AppConfig;
-if (mongoose.models.PlayLog) delete mongoose.models.PlayLog;
-if (mongoose.models.AppHitStat) delete mongoose.models.AppHitStat;
-
 export const User = mongoose.models.User || mongoose.model<IUserDocument>("User", UserSchema);
 export const HomeSection = mongoose.models.HomeSection || mongoose.model<IHomeSectionDocument>("HomeSection", HomeSectionSchema);
 export const Category = mongoose.models.Category || mongoose.model<ICategoryDocument>("Category", CategorySchema);

@@ -75,9 +75,15 @@ export async function GET(req: NextRequest) {
 
       // Aggregate endpoint breakdowns
       if (stat.endpoints) {
-        stat.endpoints.forEach((count: number, ep: string) => {
-          appMap[pkg].endpoints[ep] = (appMap[pkg].endpoints[ep] || 0) + count;
-        });
+        if (stat.endpoints instanceof Map) {
+          stat.endpoints.forEach((count: number, ep: string) => {
+            appMap[pkg].endpoints[ep] = (appMap[pkg].endpoints[ep] || 0) + (count || 0);
+          });
+        } else if (typeof stat.endpoints === "object") {
+          Object.entries(stat.endpoints).forEach(([ep, count]: [string, any]) => {
+            appMap[pkg].endpoints[ep] = (appMap[pkg].endpoints[ep] || 0) + (Number(count) || 0);
+          });
+        }
       }
     });
 
@@ -115,6 +121,7 @@ export async function GET(req: NextRequest) {
       chartData,
     });
   } catch (error: any) {
+    console.error("[AppHitsRoute Error]", error);
     return errorResponse(error.message || "Internal server error", 500);
   }
 }
