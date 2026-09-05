@@ -2,11 +2,14 @@ import { NextRequest } from "next/server";
 import { initApi, successResponse, errorResponse, authenticateRequest, authorizeRoles } from "../../../lib/api-helper";
 import { AppConfig } from "@headless/database";
 import { AppConfigInputSchema } from "@headless/types";
+import { trackAppHit } from "../../../lib/hit-tracker";
 
 export async function GET(req: NextRequest) {
   try {
     await initApi();
+    trackAppHit(req, "app_config");
     const { searchParams } = new URL(req.url);
+
     const packageName = searchParams.get("packageName");
 
     if (packageName) {

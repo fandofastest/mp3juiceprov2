@@ -476,12 +476,38 @@ const PlayLogSchema = new Schema<IPlayLogDocument>(
   { timestamps: { createdAt: true, updatedAt: false } }
 );
 
+// --- APP HIT STAT SCHEMA (FOR AGGREGATED DAILY APP API HITS) ---
+export interface IAppHitStatDocument extends Document {
+  packageName: string;
+  date: string; // YYYY-MM-DD
+  totalHits: number;
+  endpoints: Map<string, number>;
+  lastHitAt: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const AppHitStatSchema = new Schema<IAppHitStatDocument>(
+  {
+    packageName: { type: String, required: true, index: true },
+    date: { type: String, required: true, index: true },
+    totalHits: { type: Number, default: 0 },
+    endpoints: { type: Schema.Types.Map, of: Number, default: {} },
+    lastHitAt: { type: Date, default: Date.now },
+  },
+  { timestamps: true }
+);
+
+// Compound index for fast lookup and upsert per app per day
+AppHitStatSchema.index({ packageName: 1, date: 1 }, { unique: true });
+
 // Export Mongoose Models
 if (mongoose.models.Category) delete mongoose.models.Category;
 if (mongoose.models.History) delete mongoose.models.History;
 if (mongoose.models.HomeSection) delete mongoose.models.HomeSection;
 if (mongoose.models.AppConfig) delete mongoose.models.AppConfig;
 if (mongoose.models.PlayLog) delete mongoose.models.PlayLog;
+if (mongoose.models.AppHitStat) delete mongoose.models.AppHitStat;
 
 export const User = mongoose.models.User || mongoose.model<IUserDocument>("User", UserSchema);
 export const HomeSection = mongoose.models.HomeSection || mongoose.model<IHomeSectionDocument>("HomeSection", HomeSectionSchema);
@@ -497,5 +523,7 @@ export const Notification = mongoose.models.Notification || mongoose.model<INoti
 export const Track = mongoose.models.Track || mongoose.model<ITrackDocument>("Track", TrackSchema);
 export const AppConfig = mongoose.models.AppConfig || mongoose.model<IAppConfigDocument>("AppConfig", AppConfigSchema);
 export const PlayLog = mongoose.models.PlayLog || mongoose.model<IPlayLogDocument>("PlayLog", PlayLogSchema);
+export const AppHitStat = mongoose.models.AppHitStat || mongoose.model<IAppHitStatDocument>("AppHitStat", AppHitStatSchema);
+
 
 

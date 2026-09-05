@@ -1,12 +1,15 @@
 import { NextRequest } from "next/server";
 import { initApi, successResponse, errorResponse, authenticateRequest } from "../../../lib/api-helper";
 import { SystemSettings, History, AnalyticsEvent, Track, AppConfig, PlayLog } from "@headless/database";
+import { trackAppHit } from "../../../lib/hit-tracker";
 
 export async function GET(req: NextRequest) {
   try {
     await initApi();
+    trackAppHit(req, "play");
     
     // Optional/Required authentication. Let's authenticate if token is present,
+
     // and require it if we want to write history.
     const userPayload = await authenticateRequest(req);
     const userId = userPayload?.userId;

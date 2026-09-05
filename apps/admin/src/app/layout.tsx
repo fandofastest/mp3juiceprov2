@@ -5,7 +5,7 @@ import Link from "next/navigation";
 import { usePathname } from "next/navigation";
 import { 
   Music, LayoutDashboard, Sliders, FolderHeart, Image, Database, 
-  Settings, LogOut, User as UserIcon, ListMusic, Menu, Smartphone
+  Settings, LogOut, User as UserIcon, ListMusic, Menu, Smartphone, Activity
 } from "lucide-react";
 import { useState } from "react";
 import "./globals.css";
@@ -20,6 +20,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     { name: "Users Directory", href: "/users", icon: UserIcon },
     { name: "Music Tracks", href: "/tracks", icon: Music },
     { name: "Play Hit Logs", href: "/play-logs", icon: ListMusic },
+    { name: "App Hit Stats", href: "/app-stats", icon: Activity },
     { name: "Home Builder", href: "/builder", icon: Sliders },
     { name: "Categories", href: "/categories", icon: FolderHeart },
     { name: "Banners", href: "/banners", icon: Image },

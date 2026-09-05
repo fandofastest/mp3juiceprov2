@@ -2,12 +2,15 @@ import { NextRequest } from "next/server";
 import { initApi, successResponse, errorResponse, authenticateRequest, authorizeRoles } from "../../../lib/api-helper";
 import { Category } from "@headless/database";
 import { CategoryInputSchema } from "@headless/types";
+import { trackAppHit } from "../../../lib/hit-tracker";
 
 export async function GET(req: NextRequest) {
   try {
     await initApi();
+    trackAppHit(req, "categories");
     const categories = await Category.find({ isDeleted: false }).sort({ sortOrder: 1 });
     return successResponse(categories);
+
   } catch (error: any) {
     return errorResponse(error.message || "Internal server error", 500);
   }

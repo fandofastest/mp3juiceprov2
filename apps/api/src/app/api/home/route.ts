@@ -2,11 +2,14 @@ import { NextRequest } from "next/server";
 import { initApi, successResponse, errorResponse, authenticateRequest } from "../../../lib/api-helper";
 import { HomeSection, Category, Banner, Playlist, History, Favorite, SystemSettings } from "@headless/database";
 import { ProviderFactory } from "@headless/providers";
+import { trackAppHit } from "../../../lib/hit-tracker";
 
 export async function GET(req: NextRequest) {
   try {
     await initApi();
+    trackAppHit(req, "home");
     const userPayload = await authenticateRequest(req);
+
 
     // Fetch enabled homepage sections
     const sections = await HomeSection.find({ enabled: true, isDeleted: false }).sort({ sortOrder: 1 });

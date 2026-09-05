@@ -41,7 +41,10 @@ class ApiService {
   // Get Home Categories
   static Future<List<dynamic>> fetchCategories() async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/categories'));
+      final response = await http.get(
+        Uri.parse('$baseUrl/categories'),
+        headers: {'x-package-name': packageName},
+      );
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['success'] == true && data['data'] != null) {
@@ -58,7 +61,7 @@ class ApiService {
   // Fetch dynamic home builder sections
   static Future<List<dynamic>> fetchHomeSections(String? token) async {
     try {
-      final headers = <String, String>{};
+      final headers = <String, String>{'x-package-name': packageName};
       if (token != null && token.isNotEmpty) {
         headers['Authorization'] = 'Bearer $token';
       }
@@ -84,7 +87,10 @@ class ApiService {
       return searchJamendoTracks(slug, limit: 20, isTagSearch: true);
     }
     try {
-      final response = await http.get(Uri.parse('$baseUrl/categories/tracks?slug=$slug&limit=20'));
+      final response = await http.get(
+        Uri.parse('$baseUrl/categories/tracks?slug=$slug&limit=20'),
+        headers: {'x-package-name': packageName},
+      );
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['success'] == true && data['data'] != null) {
@@ -110,7 +116,10 @@ class ApiService {
       return searchJamendoTracks(query);
     }
     try {
-      final response = await http.get(Uri.parse('$baseUrl/search?q=${Uri.encodeComponent(query)}&provider=youtube'));
+      final response = await http.get(
+        Uri.parse('$baseUrl/search?q=${Uri.encodeComponent(query)}&provider=youtube'),
+        headers: {'x-package-name': packageName},
+      );
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['success'] == true && data['data'] != null) {
