@@ -38,19 +38,29 @@ export async function GET(req: NextRequest) {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    // Parallel execution of pagination and summary queries with lean optimization
-    const [total, rawLogs, totalHits, todayHits, uniqueTracks, uniqueApps] = await Promise.all([
-      PlayLog.countDocuments(query),
-      PlayLog.find(query)
+    const PlayLogModel = PlayLog as any;
+
+    // Parallel execution of pagination and summary queries with lean & aggregation optimization
+    const [rawLogs, totalHits, todayHits, uniqueTracksRes, uniqueApps] = await Promise.all([
+      PlayLogModel.find(query)
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
         .lean(),
-      PlayLog.estimatedDocumentCount().catch(() => PlayLog.countDocuments()),
-      PlayLog.countDocuments({ createdAt: { $gte: startOfToday } }),
-      PlayLog.distinct("vid", { createdAt: { $gte: thirtyDaysAgo } }).catch(() => []),
-      PlayLog.distinct("packageName").catch(() => []),
+      PlayLogModel.estimatedDocumentCount().catch(() => PlayLogModel.countDocuments()),
+      PlayLogModel.countDocuments({ createdAt: { $gte: startOfToday } }),
+      PlayLogModel.aggregate([
+        { $group: { _id: "$vid" } },
+        { $count: "total" }
+      ]).catch(() => []),
+      PlayLogModel.distinct("packageName").catch(() => []),
     ]);
+
+    const total = Object.keys(query).length > 0
+      ? await PlayLogModel.countDocuments(query)
+      : totalHits;
+
+    const uniqueTracksCount = (uniqueTracksRes && uniqueTracksRes[0] && uniqueTracksRes[0].total) || 0;
 
     const logs = (rawLogs || []).map((log: any) => ({
       id: log._id ? log._id.toString() : "",
@@ -76,7 +86,7 @@ export async function GET(req: NextRequest) {
       summary: {
         totalHits: totalHits || 0,
         todayHits: todayHits || 0,
-        uniqueTracksCount: Array.isArray(uniqueTracks) ? uniqueTracks.length : 0,
+        uniqueTracksCount: uniqueTracksCount || 0,
         uniqueAppsCount: Array.isArray(uniqueApps) ? uniqueApps.length : 0,
       },
     });
