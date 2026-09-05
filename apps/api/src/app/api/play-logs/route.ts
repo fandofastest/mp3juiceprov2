@@ -38,17 +38,17 @@ export async function GET(req: NextRequest) {
       .skip(skip)
       .limit(limit);
 
-    const logs = rawLogs.map((log) => ({
-      id: log._id.toString(),
-      vid: log.vid,
+    const logs = (rawLogs || []).map((log: any) => ({
+      id: log._id ? log._id.toString() : "",
+      vid: log.vid || "",
       title: log.title || "YouTube Track",
       artist: log.artist || "YouTube Video",
-      playUrl: log.playUrl,
+      playUrl: log.playUrl || "",
       packageName: log.packageName || "Default App",
       userId: log.userId || null,
       ipAddress: log.ipAddress || "Unknown IP",
       userAgent: log.userAgent || "Unknown Client",
-      createdAt: log.createdAt,
+      createdAt: log.createdAt || new Date(),
     }));
 
     // Calculate Summary Stats
@@ -58,22 +58,22 @@ export async function GET(req: NextRequest) {
     startOfToday.setHours(0, 0, 0, 0);
     const todayHits = await PlayLog.countDocuments({ createdAt: { $gte: startOfToday } });
 
-    const uniqueTracks = await PlayLog.distinct("vid");
-    const uniqueApps = await PlayLog.distinct("packageName");
+    const uniqueTracks = await PlayLog.distinct("vid").catch(() => []);
+    const uniqueApps = await PlayLog.distinct("packageName").catch(() => []);
 
     return successResponse({
       logs,
       pagination: {
-        total,
+        total: total || 0,
         page,
         limit,
-        pages: Math.ceil(total / limit) || 1,
+        pages: Math.ceil((total || 0) / limit) || 1,
       },
       summary: {
-        totalHits,
-        todayHits,
-        uniqueTracksCount: uniqueTracks.length,
-        uniqueAppsCount: uniqueApps.length,
+        totalHits: totalHits || 0,
+        todayHits: todayHits || 0,
+        uniqueTracksCount: Array.isArray(uniqueTracks) ? uniqueTracks.length : 0,
+        uniqueAppsCount: Array.isArray(uniqueApps) ? uniqueApps.length : 0,
       },
     });
   } catch (error: any) {

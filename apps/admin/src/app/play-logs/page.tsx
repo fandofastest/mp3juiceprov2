@@ -58,15 +58,15 @@ export default function PlayLogsPage() {
       }
 
       const res = await apiRequest(`/play-logs?${params.toString()}`);
-      setLogs(res.logs || []);
-      setSummary(res.summary || {
+      setLogs((res && res.logs) || []);
+      setSummary((res && res.summary) || {
         totalHits: 0,
         todayHits: 0,
         uniqueTracksCount: 0,
         uniqueAppsCount: 0,
       });
-      setTotalPages(res.pagination?.pages || 1);
-      setTotalCount(res.pagination?.total || 0);
+      setTotalPages((res && res.pagination?.pages) || 1);
+      setTotalCount((res && res.pagination?.total) || 0);
     } catch (err: any) {
       setError(err.message || "Failed to fetch play logs");
     } finally {
