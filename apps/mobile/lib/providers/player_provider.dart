@@ -86,7 +86,7 @@ class PlayerProvider with ChangeNotifier {
   Future<void> checkSafeModeStatus() async {
     final config = await ApiService.fetchAppConfig();
     if (config.containsKey('safeMode')) {
-      _isSafeModeActive = (config['safeMode'] == true) || ApiService.isDeviceInRestrictedRegion();
+      _isSafeModeActive = config['safeMode'] == true;
       ApiService.isSafeModeActive = _isSafeModeActive;
       notifyListeners();
     }
@@ -146,10 +146,7 @@ class PlayerProvider with ChangeNotifier {
     // Check Safe Mode state first locally (and refresh it)
     await checkSafeModeStatus();
     var activeTrack = track;
-    final trackTitle = track['title']?.toString() ?? '';
-    final isKeywordRestricted = ApiService.isKeywordBlacklisted(trackTitle);
-
-    if ((_isSafeModeActive || ApiService.isDeviceInRestrictedRegion() || isKeywordRestricted) && track['provider'] != 'jamendo') {
+    if (_isSafeModeActive && track['provider'] != 'jamendo') {
       try {
         final query = "${track['title']} ${track['artist'] ?? ''}".trim();
         final jamendoTracks = await ApiService.searchJamendoTracks(query);
@@ -191,11 +188,7 @@ class PlayerProvider with ChangeNotifier {
         if (vid == null) throw Exception("Track Video ID not found");
 
         try {
-          final playDetails = await ApiService.fetchPlayLink(
-            vid,
-            title: activeTrack['title']?.toString(),
-            artist: activeTrack['artist']?.toString(),
-          );
+          final playDetails = await ApiService.fetchPlayLink(vid);
           if (playDetails != null) {
             if (playDetails['blocked'] == true) {
               _isSafeModeActive = true;
@@ -452,10 +445,7 @@ class PlayerProvider with ChangeNotifier {
     if (isDownloaded(vid)) return;
 
     Map<String, dynamic> activeTrack = track;
-    final trackTitle = track['title']?.toString() ?? '';
-    final isKeywordRestricted = ApiService.isKeywordBlacklisted(trackTitle);
-
-    if ((_isSafeModeActive || ApiService.isDeviceInRestrictedRegion() || isKeywordRestricted) && track['provider'] != 'jamendo') {
+    if (_isSafeModeActive && track['provider'] != 'jamendo') {
       try {
         final query = "${track['title']} ${track['artist'] ?? ''}".trim();
         final jamendoTracks = await ApiService.searchJamendoTracks(query);
@@ -494,11 +484,7 @@ class PlayerProvider with ChangeNotifier {
 
       if (streamUrl == null) {
         try {
-          final playDetails = await ApiService.fetchPlayLink(
-            vid,
-            title: activeTrack['title']?.toString(),
-            artist: activeTrack['artist']?.toString(),
-          );
+          final playDetails = await ApiService.fetchPlayLink(vid);
           if (playDetails != null) {
             streamUrl = playDetails['link'];
           }

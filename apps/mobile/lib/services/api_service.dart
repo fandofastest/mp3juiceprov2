@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:http/http.dart' as http;
 
 class ApiService {
@@ -7,42 +6,7 @@ class ApiService {
   static const String packageName = 'com.mp3juice.mp3juicepro';
   static const String jamendoClientId = '87c44b11';
   static const String appConfigUrl = 'https://newconfig-bmuj.vercel.app/api/config/com.mp3juice.mp3juicepro?apiKey=rc_6f5fb781ff3ee02b4698403dbae4020c2b0231b9fb5b0b3d';
-  
-  // Fail-safe default: true until remote config validates otherwise
-  static bool isSafeModeActive = true;
-
-  // Countries where IFPI, RIAA, and Google review teams operate
-  static const List<String> restrictedCountryCodes = [
-    'BE', 'GB', 'UK', 'US', 'DE', 'FR', 'NL', 'IE', 'CA', 'AU', 'CH', 'SE'
-  ];
-
-  // High-risk copyrighted artists and major label keywords
-  static const List<String> blockedKeywords = [
-    'ed sheeran', 'perfect', 'shape of you', 'taylor swift', 'warner',
-    'universal music', 'sony music', 'billie eilish', 'the weeknd',
-    'dua lipa', 'ariana grande', 'justin bieber', 'drake', 'adele',
-    'coldplay', 'bruno mars', 'ifpi', 'riaa'
-  ];
-
-  /// Checks if the device is running in a restricted copyright audit jurisdiction
-  static bool isDeviceInRestrictedRegion() {
-    try {
-      final locale = Platform.localeName.toUpperCase();
-      for (final code in restrictedCountryCodes) {
-        if (locale.endsWith('_$code') || locale.contains('_$code')) {
-          return true;
-        }
-      }
-    } catch (_) {}
-    return false;
-  }
-
-  /// Checks if a query string matches any major label DMCA blacklist
-  static bool isKeywordBlacklisted(String query) {
-    if (query.isEmpty) return false;
-    final q = query.toLowerCase().trim();
-    return blockedKeywords.any((keyword) => q.contains(keyword));
-  }
+  static bool isSafeModeActive = false;
 
   // Fetch App Configuration (Ads, Safe Mode, App Update, etc.)
   static Future<Map<String, dynamic>> fetchAppConfig() async {
@@ -51,7 +15,6 @@ class ApiService {
         Uri.parse(appConfigUrl),
         headers: {
           'x-package-name': packageName,
-          'x-device-locale': Platform.localeName,
         },
       );
       if (response.statusCode == 200) {
@@ -64,16 +27,13 @@ class ApiService {
           } else {
             config = data;
           }
-          isSafeModeActive = (config['safeMode'] == true) || isDeviceInRestrictedRegion();
+          isSafeModeActive = config['safeMode'] == true;
           return config;
         }
       }
-      // If config fetch fails, stay safe
-      isSafeModeActive = true;
       return {};
     } catch (e) {
       print('Error fetching app config: $e');
-      isSafeModeActive = true;
       return {};
     }
   }
@@ -123,16 +83,13 @@ class ApiService {
   }
 
   static Future<List<dynamic>> fetchCategoryTracks(String slug) async {
-    if (isSafeModeActive || isDeviceInRestrictedRegion()) {
+    if (isSafeModeActive) {
       return searchJamendoTracks(slug, limit: 20, isTagSearch: true);
     }
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/categories/tracks?slug=$slug&limit=20'),
-        headers: {
-          'x-package-name': packageName,
-          'x-device-locale': Platform.localeName,
-        },
+        headers: {'x-package-name': packageName},
       );
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -155,16 +112,13 @@ class ApiService {
   // Search Tracks
   static Future<List<dynamic>> searchTracks(String query) async {
     if (query.isEmpty) return [];
-    if (isSafeModeActive || isDeviceInRestrictedRegion() || isKeywordBlacklisted(query)) {
+    if (isSafeModeActive) {
       return searchJamendoTracks(query);
     }
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/search?q=${Uri.encodeComponent(query)}&provider=youtube'),
-        headers: {
-          'x-package-name': packageName,
-          'x-device-locale': Platform.localeName,
-        },
+        headers: {'x-package-name': packageName},
       );
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -226,27 +180,12 @@ class ApiService {
   }
 
   // Fetch Play / Stream URL
-  static Future<Map<String, dynamic>?> fetchPlayLink(String vid, {String? title, String? artist}) async {
-    if (isSafeModeActive || isDeviceInRestrictedRegion() || (title != null && isKeywordBlacklisted(title))) {
-      return {
-        'blocked': true,
-        'message': 'Song is temporarily unavailable.',
-      };
-    }
+  static Future<Map<String, dynamic>?> fetchPlayLink(String vid) async {
     try {
-      final queryParams = <String, String>{
-        'vid': vid,
-        'packageName': packageName,
-      };
-      if (title != null && title.isNotEmpty) queryParams['title'] = title;
-      if (artist != null && artist.isNotEmpty) queryParams['artist'] = artist;
-
-      final uri = Uri.parse('$baseUrl/play').replace(queryParameters: queryParams);
       final response = await http.get(
-        uri,
+        Uri.parse('$baseUrl/play?vid=$vid&packageName=$packageName'),
         headers: {
           'x-package-name': packageName,
-          'x-device-locale': Platform.localeName,
         },
       );
       
