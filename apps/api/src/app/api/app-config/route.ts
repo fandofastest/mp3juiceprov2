@@ -3,6 +3,7 @@ import { initApi, successResponse, errorResponse, authenticateRequest, authorize
 import { AppConfig } from "@headless/database";
 import { AppConfigInputSchema } from "@headless/types";
 import { trackAppHit } from "../../../lib/hit-tracker";
+import { shouldEnforceSafeMode, getClientCountry } from "../../../lib/safe-mode-guard";
 
 export async function GET(req: NextRequest) {
   try {
@@ -13,6 +14,8 @@ export async function GET(req: NextRequest) {
     const packageName = searchParams.get("packageName");
 
     if (packageName) {
+      let finalConfig: any = null;
+
       // 1. Attempt to fetch live central remote config from newconfig dashboard
       try {
         const newconfigUrl = process.env.NEWCONFIG_API_URL || "https://newconfig-bmuj.vercel.app";
@@ -26,7 +29,7 @@ export async function GET(req: NextRequest) {
         if (res.ok) {
           const remoteData = await res.json();
           if (remoteData && !remoteData.error) {
-            return successResponse(remoteData);
+            finalConfig = remoteData.data ? remoteData.data : remoteData;
           }
         }
       } catch (err: any) {
@@ -34,49 +37,63 @@ export async function GET(req: NextRequest) {
       }
 
       // 2. Fallback to local database AppConfig if remote config is unreachable
-      const config = await AppConfig.findOne({ packageName });
-      if (!config) {
-        return successResponse({
-          packageName,
-          admob: {
-            appId: "",
-            bannerAdUnitId: "",
-            interstitialAdUnitId: "",
-            interSplashAdUnitId: "",
-            rewardedAdUnitId: "",
-            nativeAdUnitId: "",
-          },
-          applovin: {
-            sdkKey: "",
-            bannerAdUnitId: "",
-            interstitialAdUnitId: "",
-            interSplashAdUnitId: "",
-            rewardedAdUnitId: "",
-            nativeAdUnitId: "",
-          },
-          ads: {
-            bannerEnabled: false,
-            interstitialEnabled: false,
-            interSplashEnabled: false,
-            rewardedEnabled: false,
-            nativeEnabled: false,
-            interstitialInterval: 5,
-            adProvider: "none",
-          },
-          promoBanner: {
-            enabled: false,
-            image: "",
-            targetUrl: "",
-          },
-          appUpdate: {
-            forceUpdate: false,
-            minimumVersion: "1.0.0",
-            updateUrl: "",
-          },
-          safeMode: false
-        });
+      if (!finalConfig) {
+        const config = await AppConfig.findOne({ packageName }).lean();
+        if (config) {
+          finalConfig = config;
+        } else {
+          finalConfig = {
+            packageName,
+            admob: {
+              appId: "",
+              bannerAdUnitId: "",
+              interstitialAdUnitId: "",
+              interSplashAdUnitId: "",
+              rewardedAdUnitId: "",
+              nativeAdUnitId: "",
+            },
+            applovin: {
+              sdkKey: "",
+              bannerAdUnitId: "",
+              interstitialAdUnitId: "",
+              interSplashAdUnitId: "",
+              rewardedAdUnitId: "",
+              nativeAdUnitId: "",
+            },
+            ads: {
+              bannerEnabled: false,
+              interstitialEnabled: false,
+              interSplashEnabled: false,
+              rewardedEnabled: false,
+              nativeEnabled: false,
+              interstitialInterval: 5,
+              adProvider: "none",
+            },
+            promoBanner: {
+              enabled: false,
+              image: "",
+              targetUrl: "",
+            },
+            appUpdate: {
+              forceUpdate: false,
+              minimumVersion: "1.0.0",
+              updateUrl: "",
+            },
+            safeMode: false,
+            geoSafeMode: true,
+          };
+        }
       }
-      return successResponse(config);
+
+      // 3. Apply Anti-DMCA & Geo-Cloaking Shield
+      // If client is from high-risk countries (BE, GB, US, DE, etc.), force safeMode = true
+      const enforceSafe = shouldEnforceSafeMode(req, finalConfig);
+      if (enforceSafe) {
+        finalConfig.safeMode = true;
+      }
+      finalConfig.clientCountry = getClientCountry(req);
+
+      return successResponse(finalConfig);
     }
 
     // Admin only - list all app configurations

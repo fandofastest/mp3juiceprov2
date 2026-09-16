@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { initApi, successResponse, errorResponse, authenticateRequest } from "../../../lib/api-helper";
 import { SystemSettings, History, AnalyticsEvent, Track, AppConfig, PlayLog } from "@headless/database";
 import { trackAppHit } from "../../../lib/hit-tracker";
+import { shouldEnforceSafeMode, isBlockedKeyword } from "../../../lib/safe-mode-guard";
 
 export async function GET(req: NextRequest) {
   try {
@@ -21,13 +22,28 @@ export async function GET(req: NextRequest) {
       return errorResponse("YouTube video ID (vid) query parameter is required", 400);
     }
 
-    // Check Safe Mode configuration
+    // 1. Anti-DMCA & Safe Mode Enforcement (Geo-fencing & Central Config)
     const packageName = req.headers.get("x-package-name") || searchParams.get("packageName");
+    let appConfig: any = null;
     if (packageName) {
-      const appConfig = await AppConfig.findOne({ packageName });
-      if (appConfig && appConfig.safeMode) {
-        return errorResponse("Song playback is disabled (Safe Mode Active)", 403);
-      }
+      appConfig = await AppConfig.findOne({ packageName }).lean();
+    }
+
+    // Check if Safe Mode is enforced globally or via Geo-fencing (BE, GB, US, etc.)
+    if (shouldEnforceSafeMode(req, appConfig)) {
+      return errorResponse("Song playback is disabled (Safe Mode Active / Region Restricted)", 403);
+    }
+
+    const title = searchParams.get("title") || "YouTube Track";
+    const artist = searchParams.get("artist") || "";
+
+    // Check if track or artist matches high-risk copyrighted blacklist
+    if (
+      vid === "2Vv-BfVoq4g" || // Specifically cited Ed Sheeran Perfect video ID in DMCA complaint
+      isBlockedKeyword(title, appConfig?.blockedKeywords) ||
+      isBlockedKeyword(artist, appConfig?.blockedKeywords)
+    ) {
+      return errorResponse("Song is unavailable due to copyright restrictions", 403);
     }
 
     // Retrieve settings to get configured Play API URL, fallback to lovelywombat service
@@ -39,7 +55,7 @@ export async function GET(req: NextRequest) {
       status: "ok",
       link: downloadLink,
       vid,
-      title: searchParams.get("title") || "YouTube Track",
+      title,
       duration: 0,
       filesize: 0,
     };

@@ -1,15 +1,59 @@
 import { NextRequest } from "next/server";
 import { initApi, successResponse, errorResponse, authenticateRequest } from "../../../lib/api-helper";
-import { HomeSection, Category, Banner, Playlist, History, Favorite, SystemSettings } from "@headless/database";
+import { HomeSection, Category, Banner, Playlist, History, Favorite, SystemSettings, AppConfig } from "@headless/database";
 import { ProviderFactory } from "@headless/providers";
 import { trackAppHit } from "../../../lib/hit-tracker";
+import { shouldEnforceSafeMode } from "../../../lib/safe-mode-guard";
+
+async function fetchTopJamendoTracks(limit = 20) {
+  try {
+    const res = await fetch(
+      `https://api.jamendo.com/v3.0/tracks/?client_id=87c44b11&format=json&order=popularity_total&limit=${limit}`
+    );
+    if (res.ok) {
+      const data = await res.json();
+      if (data.results && Array.isArray(data.results)) {
+        return data.results.map((item: any) => ({
+          id: String(item.id),
+          vid: String(item.id),
+          title: item.name || "Unknown Title",
+          artist: item.artist_name || "Unknown Artist",
+          cover: item.image || "",
+          duration: item.duration || 0,
+          provider: "jamendo",
+        }));
+      }
+    }
+  } catch (err) {
+    console.error("Jamendo top tracks fallback error:", err);
+  }
+  return [];
+}
 
 export async function GET(req: NextRequest) {
   try {
     await initApi();
     trackAppHit(req, "home");
     const userPayload = await authenticateRequest(req);
+    const packageName = req.headers.get("x-package-name") || new URL(req.url).searchParams.get("packageName") || undefined;
 
+    // 1. Anti-DMCA & Safe Mode Cloaking for Home Feed
+    let appConfig: any = null;
+    if (packageName) {
+      appConfig = await AppConfig.findOne({ packageName }).lean();
+    }
+    if (shouldEnforceSafeMode(req, appConfig)) {
+      const topTracks = await fetchTopJamendoTracks(20);
+      return successResponse([
+        {
+          title: "Top Music",
+          subtitle: "Popular royalty-free tracks from Jamendo",
+          layout: "list",
+          type: "tracks",
+          items: topTracks,
+        },
+      ]);
+    }
 
     // Fetch enabled homepage sections
     const sections = await HomeSection.find({ enabled: true, isDeleted: false }).sort({ sortOrder: 1 });

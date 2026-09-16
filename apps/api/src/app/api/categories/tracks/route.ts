@@ -1,7 +1,33 @@
 import { NextRequest } from "next/server";
 import { initApi, successResponse, errorResponse } from "../../../../lib/api-helper";
-import { Category, Track, SystemSettings } from "@headless/database";
+import { Category, Track, SystemSettings, AppConfig } from "@headless/database";
 import { ProviderFactory } from "@headless/providers";
+import { shouldEnforceSafeMode, isBlockedKeyword } from "../../../../lib/safe-mode-guard";
+
+async function fetchJamendoCategoryTracks(query: string, limit = 20) {
+  try {
+    const res = await fetch(
+      `https://api.jamendo.com/v3.0/tracks/?client_id=87c44b11&format=json&tags=${encodeURIComponent(query)}&limit=${limit}`
+    );
+    if (res.ok) {
+      const data = await res.json();
+      if (data.results && Array.isArray(data.results)) {
+        return data.results.map((item: any) => ({
+          id: String(item.id),
+          vid: String(item.id),
+          title: item.name || "Unknown Title",
+          artist: item.artist_name || "Unknown Artist",
+          cover: item.image || "",
+          duration: item.duration || 0,
+          provider: "jamendo",
+        }));
+      }
+    }
+  } catch (err) {
+    console.error("Jamendo category tracks fallback error:", err);
+  }
+  return [];
+}
 
 export async function GET(req: NextRequest) {
   try {
@@ -9,6 +35,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const slug = searchParams.get("slug");
     const id = searchParams.get("id");
+    const packageName = req.headers.get("x-package-name") || searchParams.get("packageName") || undefined;
 
     const settings = await SystemSettings.findOne();
     const defaultLimit = settings?.searchLimit || 20;
@@ -16,6 +43,22 @@ export async function GET(req: NextRequest) {
 
     if (!slug && !id) {
       return errorResponse("Either category slug or id query parameter is required", 400);
+    }
+
+    // 1. Anti-DMCA Safe Mode & Geo-fencing Enforcement
+    let appConfig: any = null;
+    if (packageName) {
+      appConfig = await AppConfig.findOne({ packageName }).lean();
+    }
+    const isSafe = shouldEnforceSafeMode(req, appConfig);
+    const isBlocked = isBlockedKeyword(slug || "", appConfig?.blockedKeywords);
+
+    if (isSafe || isBlocked) {
+      const safeTracks = await fetchJamendoCategoryTracks(slug || "music", limit);
+      return successResponse({
+        category: { title: slug || "Music", slug: slug || "music" },
+        tracks: safeTracks,
+      });
     }
 
     // Find category

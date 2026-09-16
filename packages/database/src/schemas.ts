@@ -402,6 +402,9 @@ export interface IAppConfigDocument extends Document {
     updateUrl?: string;
   };
   safeMode: boolean;
+  geoSafeMode?: boolean;
+  restrictedCountries?: string[];
+  blockedKeywords?: string[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -445,6 +448,9 @@ const AppConfigSchema = new Schema<IAppConfigDocument>(
       updateUrl: { type: String },
     },
     safeMode: { type: Boolean, default: false },
+    geoSafeMode: { type: Boolean, default: true },
+    restrictedCountries: { type: [String], default: ["BE", "GB", "US", "DE", "FR", "NL", "IE", "CA", "AU", "CH", "SE"] },
+    blockedKeywords: { type: [String], default: ["ed sheeran", "taylor swift", "warner music", "universal music", "sony music", "billie eilish", "the weeknd", "dua lipa", "ariana grande", "justin bieber", "drake", "adele", "coldplay", "bruno mars"] },
   },
   { timestamps: true }
 );

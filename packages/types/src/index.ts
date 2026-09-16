@@ -342,6 +342,9 @@ export interface AppConfig {
     updateUrl?: string;
   };
   safeMode: boolean;
+  geoSafeMode?: boolean;
+  restrictedCountries?: string[];
+  blockedKeywords?: string[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -384,4 +387,7 @@ export const AppConfigInputSchema = z.object({
     updateUrl: z.string().optional(),
   }).default({}),
   safeMode: z.boolean().default(false),
+  geoSafeMode: z.boolean().default(true),
+  restrictedCountries: z.array(z.string()).default(["BE", "GB", "US", "DE", "FR", "NL", "IE", "CA", "AU", "CH", "SE"]),
+  blockedKeywords: z.array(z.string()).default(["ed sheeran", "taylor swift", "warner music", "universal music", "sony music", "billie eilish", "the weeknd", "dua lipa", "ariana grande", "justin bieber", "drake", "adele", "coldplay", "bruno mars"]),
 });

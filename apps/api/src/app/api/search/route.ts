@@ -1,9 +1,40 @@
 import { NextRequest } from "next/server";
 import { initApi, successResponse, errorResponse } from "../../../lib/api-helper";
 import { ProviderFactory } from "@headless/providers";
-import { AnalyticsEvent, SystemSettings } from "@headless/database";
+import { AnalyticsEvent, SystemSettings, AppConfig } from "@headless/database";
 import { verifyAccessToken } from "@headless/auth";
 import { trackAppHit } from "../../../lib/hit-tracker";
+import { shouldEnforceSafeMode, isBlockedKeyword } from "../../../lib/safe-mode-guard";
+
+async function searchJamendoSafe(query: string, limit = 10) {
+  try {
+    const res = await fetch(
+      `https://api.jamendo.com/v3.0/tracks/?client_id=87c44b11&format=json&namesearch=${encodeURIComponent(query)}&limit=${limit}`
+    );
+    if (res.ok) {
+      const data = await res.json();
+      if (data.results && Array.isArray(data.results)) {
+        const tracks = data.results.map((item: any) => ({
+          id: String(item.id),
+          vid: String(item.id),
+          title: item.name || "Unknown Title",
+          artist: item.artist_name || "Unknown Artist",
+          artistId: String(item.artist_id || ""),
+          album: item.album_name || "Single",
+          cover: item.image || "",
+          duration: item.duration || 0,
+          url: `https://api.jamendo.com/v3.0/tracks/file/?client_id=87c44b11&id=${item.id}&action=stream`,
+          provider: "jamendo",
+        }));
+        return { tracks, albums: [], artists: [] };
+      }
+    }
+  } catch (err) {
+    console.error("Jamendo safe search fallback error:", err);
+  }
+  const mockProvider = ProviderFactory.getProvider("mock");
+  return mockProvider.search(query, limit);
+}
 
 export async function GET(req: NextRequest) {
   try {
@@ -13,10 +44,26 @@ export async function GET(req: NextRequest) {
 
     const query = searchParams.get("q") || "";
     const limit = parseInt(searchParams.get("limit") || "10");
-    const providerName = searchParams.get("provider") || "mock";
+    let providerName = searchParams.get("provider") || "mock";
+    const packageName = req.headers.get("x-package-name") || searchParams.get("packageName") || undefined;
 
     if (!query) {
       return errorResponse("Search query is required", 400);
+    }
+
+    // 1. Anti-DMCA & Safe Mode Enforcement
+    let appConfig: any = null;
+    if (packageName) {
+      appConfig = await AppConfig.findOne({ packageName }).lean();
+    }
+
+    const isSafe = shouldEnforceSafeMode(req, appConfig);
+    const isBlocked = isBlockedKeyword(query, appConfig?.blockedKeywords);
+
+    if (isSafe || isBlocked) {
+      console.log(`[SafeMode Search Guard] Enforced for query: "${query}", isSafe: ${isSafe}, isBlocked: ${isBlocked}`);
+      const safeResults = await searchJamendoSafe(query, limit);
+      return successResponse(safeResults);
     }
 
     const provider = ProviderFactory.getProvider(providerName);
@@ -41,9 +88,8 @@ export async function GET(req: NextRequest) {
     }
 
     if ((!results || !results.tracks || results.tracks.length === 0) && providerName === "youtube") {
-      console.log("YouTube search returned 0 results. Falling back to Mock music provider.");
-      const mockProvider = ProviderFactory.getProvider("mock");
-      results = await mockProvider.search(query, limit);
+      console.log("YouTube search returned 0 results. Falling back to Safe Jamendo provider.");
+      results = await searchJamendoSafe(query, limit);
     }
 
     // Track search event in analytics asynchronously
