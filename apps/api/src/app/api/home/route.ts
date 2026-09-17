@@ -4,16 +4,22 @@ import { HomeSection, Category, Banner, Playlist, History, Favorite, SystemSetti
 import { ProviderFactory } from "@headless/providers";
 import { trackAppHit } from "../../../lib/hit-tracker";
 import { shouldEnforceSafeMode } from "../../../lib/safe-mode-guard";
+import { CacheService } from "@headless/utils";
 
 async function fetchTopJamendoTracks(limit = 20) {
+  const cacheKey = `jamendo_top_tracks:${limit}`;
+  const cached = await CacheService.get<any[]>(cacheKey);
+  if (cached) return cached;
+
   try {
     const res = await fetch(
-      `https://api.jamendo.com/v3.0/tracks/?client_id=87c44b11&format=json&order=popularity_total&limit=${limit}`
+      `https://api.jamendo.com/v3.0/tracks/?client_id=87c44b11&format=json&order=popularity_total&limit=${limit}`,
+      { signal: AbortSignal.timeout(3500) }
     );
     if (res.ok) {
       const data = await res.json();
       if (data.results && Array.isArray(data.results)) {
-        return data.results.map((item: any) => ({
+        const tracks = data.results.map((item: any) => ({
           id: String(item.id),
           vid: String(item.id),
           title: item.name || "Unknown Title",
@@ -22,10 +28,14 @@ async function fetchTopJamendoTracks(limit = 20) {
           duration: item.duration || 0,
           provider: "jamendo",
         }));
+        if (tracks.length > 0) {
+          CacheService.set(cacheKey, tracks, 3600).catch(() => {});
+        }
+        return tracks;
       }
     }
   } catch (err) {
-    console.error("Jamendo top tracks fallback error:", err);
+    // Fail silently
   }
   return [];
 }
@@ -37,14 +47,22 @@ export async function GET(req: NextRequest) {
     const userPayload = await authenticateRequest(req);
     const packageName = req.headers.get("x-package-name") || new URL(req.url).searchParams.get("packageName") || undefined;
 
-    // 1. Anti-DMCA & Safe Mode Cloaking for Home Feed
+    // 1. Anti-DMCA & Safe Mode Cloaking for Home Feed (cached)
     let appConfig: any = null;
     if (packageName) {
-      appConfig = await AppConfig.findOne({ packageName }).lean();
+      const appConfigKey = `raw_app_config:${packageName}`;
+      appConfig = await CacheService.get(appConfigKey);
+      if (!appConfig) {
+        appConfig = await AppConfig.findOne({ packageName }).lean();
+        if (appConfig) {
+          CacheService.set(appConfigKey, appConfig, 600).catch(() => {});
+        }
+      }
     }
+
     if (shouldEnforceSafeMode(req, appConfig)) {
       const topTracks = await fetchTopJamendoTracks(20);
-      return successResponse([
+      const safeFeed = [
         {
           title: "Top Music",
           subtitle: "Popular royalty-free tracks from Jamendo",
@@ -52,7 +70,21 @@ export async function GET(req: NextRequest) {
           type: "tracks",
           items: topTracks,
         },
-      ]);
+      ];
+      const resp = successResponse(safeFeed);
+      resp.headers.set("Cache-Control", "public, max-age=120, stale-while-revalidate=600");
+      return resp;
+    }
+
+    // Check Cache for public homepage
+    const homeCacheKey = `home:public_sections:${packageName || "default"}`;
+    if (!userPayload) {
+      const cached = await CacheService.get(homeCacheKey);
+      if (cached) {
+        const resp = successResponse(cached);
+        resp.headers.set("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
+        return resp;
+      }
     }
 
     // Fetch enabled homepage sections
@@ -187,7 +219,13 @@ export async function GET(req: NextRequest) {
       })
     );
 
-    return successResponse(populatedSections);
+    if (!userPayload && populatedSections && populatedSections.length > 0) {
+      CacheService.set(homeCacheKey, populatedSections, 300).catch(() => {});
+    }
+
+    const resp = successResponse(populatedSections);
+    resp.headers.set("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
+    return resp;
   } catch (error: any) {
     return errorResponse(error.message || "Internal server error", 500);
   }

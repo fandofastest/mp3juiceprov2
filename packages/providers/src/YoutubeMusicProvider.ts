@@ -2,6 +2,45 @@ import { MusicProvider } from "./MusicProvider";
 import { NormalizedSearchResults, NormalizedTrack, NormalizedAlbum, NormalizedArtist } from "@headless/types";
 import ytSearch from "yt-search";
 
+// Scraper Concurrency Limiter: Prevent CPU exhaustion on 1-vCPU server
+let activeScrapes = 0;
+const MAX_CONCURRENT_SCRAPES = 3;
+const scrapeWaitQueue: Array<() => void> = [];
+
+async function acquireScrapeSlot(timeoutMs = 3000): Promise<boolean> {
+  if (activeScrapes < MAX_CONCURRENT_SCRAPES) {
+    activeScrapes++;
+    return true;
+  }
+  if (scrapeWaitQueue.length >= 15) {
+    // Queue too long, reject immediately to protect event loop
+    return false;
+  }
+
+  return new Promise<boolean>((resolve) => {
+    const timer = setTimeout(() => {
+      const idx = scrapeWaitQueue.indexOf(notify);
+      if (idx !== -1) scrapeWaitQueue.splice(idx, 1);
+      resolve(false);
+    }, timeoutMs);
+
+    function notify() {
+      clearTimeout(timer);
+      resolve(true);
+    }
+    scrapeWaitQueue.push(notify);
+  });
+}
+
+function releaseScrapeSlot(): void {
+  activeScrapes--;
+  if (scrapeWaitQueue.length > 0) {
+    activeScrapes++;
+    const next = scrapeWaitQueue.shift();
+    if (next) next();
+  }
+}
+
 export class YoutubeMusicProvider implements MusicProvider {
   name = "YouTube Provider";
   private apiKey: string;
@@ -15,43 +54,52 @@ export class YoutubeMusicProvider implements MusicProvider {
   }
 
   async search(query: string, limit = 10): Promise<NormalizedSearchResults> {
-    try {
-      // Primary: Use InnerTube Scraper (yt-search) - No API Key required, no quota limits
-      const searchResult = await ytSearch(query);
-      const videos = searchResult?.videos ? searchResult.videos.slice(0, limit) : [];
+    const hasSlot = await acquireScrapeSlot(3000);
+    if (hasSlot) {
+      try {
+        // Primary: Use InnerTube Scraper with strict 4s timeout
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("Scraper timeout")), 4000)
+        );
 
-      if (videos.length > 0) {
-        const tracks: NormalizedTrack[] = videos.map((video: any) => ({
-          id: video.videoId || Math.random().toString(),
-          vid: video.videoId,
-          title: video.title || "Unknown Title",
-          artist: video.author?.name || "Unknown Artist",
-          cover: video.image || video.thumbnail || "",
-          duration: video.seconds || 240,
-          url: video.url || `https://www.youtube.com/watch?v=${video.videoId}`,
-          provider: "youtube",
-        }));
+        const searchResult: any = await Promise.race([ytSearch(query), timeoutPromise]);
+        const videos = searchResult?.videos ? searchResult.videos.slice(0, limit) : [];
 
-        const artists: NormalizedArtist[] = videos
-          .map((video: any) => ({
-            id: video.author?.name || "unknown_channel",
-            name: video.author?.name || "Unknown Artist",
-            avatar: video.image || "",
+        if (videos.length > 0) {
+          const tracks: NormalizedTrack[] = videos.map((video: any) => ({
+            id: video.videoId || Math.random().toString(),
+            vid: video.videoId,
+            title: video.title || "Unknown Title",
+            artist: video.author?.name || "Unknown Artist",
+            cover: video.image || video.thumbnail || "",
+            duration: video.seconds || 240,
+            url: video.url || `https://www.youtube.com/watch?v=${video.videoId}`,
             provider: "youtube",
-          }))
-          .filter((val: any, idx: any, self: any) => self.findIndex((t: any) => t.id === val.id) === idx);
+          }));
 
-        // Auto-cache tracks to local database in background
-        this.cacheTracksInBackground(tracks);
+          const artists: NormalizedArtist[] = videos
+            .map((video: any) => ({
+              id: video.author?.name || "unknown_channel",
+              name: video.author?.name || "Unknown Artist",
+              avatar: video.image || "",
+              provider: "youtube",
+            }))
+            .filter((val: any, idx: any, self: any) => self.findIndex((t: any) => t.id === val.id) === idx);
 
-        return {
-          tracks,
-          albums: [],
-          artists,
-        };
+          // Auto-cache tracks to local database in background
+          this.cacheTracksInBackground(tracks);
+
+          return {
+            tracks,
+            albums: [],
+            artists,
+          };
+        }
+      } catch (scraperError) {
+        // Silently proceed to fallback if scraper times out or fails
+      } finally {
+        releaseScrapeSlot();
       }
-    } catch (scraperError) {
-      console.warn("yt-search scraper encountered error, falling back to official API if key exists:", scraperError);
     }
 
     // Fallback: Official YouTube Data API if API Key is available
@@ -188,24 +236,29 @@ export class YoutubeMusicProvider implements MusicProvider {
   private cacheTracksInBackground(tracks: NormalizedTrack[]) {
     if (tracks.length === 0) return;
     import("@headless/database").then(({ Track }) => {
-      Promise.all(
-        tracks.map(t => {
-          if (!t.vid) return Promise.resolve();
-          return Track.findOneAndUpdate(
-            { vid: t.vid },
-            {
-              vid: t.vid,
-              title: t.title,
-              artist: t.artist,
-              cover: t.cover,
-              duration: t.duration,
-              provider: "youtube",
+      const ops = tracks
+        .filter(t => Boolean(t.vid))
+        .map(t => ({
+          updateOne: {
+            filter: { vid: t.vid },
+            update: {
+              $set: {
+                vid: t.vid,
+                title: t.title,
+                artist: t.artist,
+                cover: t.cover,
+                duration: t.duration,
+                provider: "youtube",
+              },
             },
-            { upsert: true }
-          );
-        })
-      ).catch(err => console.error("Auto-caching tracks failed:", err));
-    }).catch(err => console.error("Failed to load Track model for caching:", err));
+            upsert: true,
+          },
+        }));
+
+      if (ops.length > 0) {
+        Track.bulkWrite(ops, { ordered: false }).catch(() => {});
+      }
+    }).catch(() => {});
   }
 }
 

@@ -19,19 +19,30 @@ export function addSecurityHeaders(response: NextResponse): NextResponse {
 }
 
 // Global initialization helper
-export async function initApi() {
-  await connectToDatabase();
-  CacheService.initialize();
+let isInitialized = false;
+let initPromise: Promise<void> | null = null;
 
-  // Auto-seed if database is empty
-  try {
-    const userCount = await User.countDocuments();
-    if (userCount === 0) {
-      await seedDatabase();
+export async function initApi() {
+  if (isInitialized) return;
+  if (initPromise) return initPromise;
+
+  initPromise = (async () => {
+    await connectToDatabase();
+    CacheService.initialize();
+
+    // Auto-seed if database is empty (only once on startup)
+    try {
+      const userCount = await User.countDocuments();
+      if (userCount === 0) {
+        await seedDatabase();
+      }
+    } catch (err) {
+      console.error("Auto seeding failed:", err);
     }
-  } catch (err) {
-    console.error("Auto seeding failed:", err);
-  }
+    isInitialized = true;
+  })();
+
+  return initPromise;
 }
 
 // Rate limiting in-memory fallback

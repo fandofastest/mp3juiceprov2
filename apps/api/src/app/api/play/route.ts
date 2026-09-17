@@ -3,15 +3,14 @@ import { initApi, successResponse, errorResponse, authenticateRequest } from "..
 import { SystemSettings, History, AnalyticsEvent, Track, AppConfig, PlayLog } from "@headless/database";
 import { trackAppHit } from "../../../lib/hit-tracker";
 import { shouldEnforceSafeMode, isBlockedKeyword } from "../../../lib/safe-mode-guard";
+import { CacheService } from "@headless/utils";
 
 export async function GET(req: NextRequest) {
   try {
     await initApi();
     trackAppHit(req, "play");
     
-    // Optional/Required authentication. Let's authenticate if token is present,
-
-    // and require it if we want to write history.
+    // Optional/Required authentication
     const userPayload = await authenticateRequest(req);
     const userId = userPayload?.userId;
 
@@ -22,11 +21,18 @@ export async function GET(req: NextRequest) {
       return errorResponse("YouTube video ID (vid) query parameter is required", 400);
     }
 
-    // 1. Anti-DMCA & Safe Mode Enforcement (Geo-fencing & Central Config)
+    // 1. Anti-DMCA & Safe Mode Enforcement (cached)
     const packageName = req.headers.get("x-package-name") || searchParams.get("packageName");
     let appConfig: any = null;
     if (packageName) {
-      appConfig = await AppConfig.findOne({ packageName }).lean();
+      const appConfigKey = `raw_app_config:${packageName}`;
+      appConfig = await CacheService.get(appConfigKey);
+      if (!appConfig) {
+        appConfig = await AppConfig.findOne({ packageName }).lean();
+        if (appConfig) {
+          CacheService.set(appConfigKey, appConfig, 600).catch(() => {});
+        }
+      }
     }
 
     // Check if Safe Mode is enforced globally or via Geo-fencing (BE, GB, US, etc.)
@@ -39,17 +45,26 @@ export async function GET(req: NextRequest) {
 
     // Check if track or artist matches high-risk copyrighted blacklist
     if (
-      vid === "2Vv-BfVoq4g" || // Specifically cited Ed Sheeran Perfect video ID in DMCA complaint
+      vid === "2Vv-BfVoq4g" ||
       isBlockedKeyword(title, appConfig?.blockedKeywords) ||
       isBlockedKeyword(artist, appConfig?.blockedKeywords)
     ) {
       return errorResponse("Song is unavailable due to copyright restrictions", 403);
     }
 
-    // Retrieve settings to get configured Play API URL, fallback to lovelywombat service
-    const settings = await SystemSettings.findOne();
-    const baseUrl = settings?.apiKeys?.get("play_api_url") || process.env.PLAY_API_URL || "https://ytdl.lovelywombat.box.ca/dl";
-    const downloadLink = `${baseUrl.replace(/\/+$/, '')}/${vid}`;
+    // Retrieve settings (cached in memory)
+    let baseUrl = await CacheService.get<string>("settings:play_api_url");
+    if (!baseUrl) {
+      try {
+        const settings = await SystemSettings.findOne().lean();
+        baseUrl = (settings as any)?.apiKeys?.get ? (settings as any).apiKeys.get("play_api_url") : (settings as any)?.apiKeys?.play_api_url || process.env.PLAY_API_URL || "https://ytdl.lovelywombat.box.ca/dl";
+        CacheService.set("settings:play_api_url", baseUrl, 600).catch(() => {});
+      } catch {
+        baseUrl = process.env.PLAY_API_URL || "https://ytdl.lovelywombat.box.ca/dl";
+      }
+    }
+    const safeBaseUrl = baseUrl || process.env.PLAY_API_URL || "https://ytdl.lovelywombat.box.ca/dl";
+    const downloadLink = `${safeBaseUrl.replace(/\/+$/, '')}/${vid}`;
 
     const data = {
       status: "ok",
@@ -60,7 +75,7 @@ export async function GET(req: NextRequest) {
       filesize: 0,
     };
 
-    // Log Play Hit in PlayLog (resource details, IP, package name, user)
+    // Log Play Hit in PlayLog (non-blocking)
     const ipAddress = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || undefined;
     const userAgent = req.headers.get("user-agent") || undefined;
 
@@ -73,9 +88,9 @@ export async function GET(req: NextRequest) {
       userId: userId || undefined,
       ipAddress,
       userAgent,
-    }).catch((err: any) => console.error("PlayLog logging failed:", err));
+    }).catch(() => {});
 
-    // Log Analytics Play Event
+    // Log Analytics Play Event (non-blocking)
     AnalyticsEvent.create({
       eventType: "Play Event",
       userId,
@@ -86,13 +101,13 @@ export async function GET(req: NextRequest) {
         filesize: data.filesize || 0,
         provider: "youtube",
       },
-    }).catch((err: any) => console.error("Analytics play logging failed:", err));
+    }).catch(() => {});
 
-    // Automatically save track to local database Track cache
-    try {
-      await Track.findOneAndUpdate(
-        { vid },
-        {
+    // Save track to local database cache asynchronously (non-blocking)
+    Track.updateOne(
+      { vid },
+      {
+        $set: {
           vid,
           title: data.title || "YouTube Track",
           artist: "YouTube Video",
@@ -100,11 +115,9 @@ export async function GET(req: NextRequest) {
           duration: Math.round(data.duration || 240),
           provider: "youtube",
         },
-        { upsert: true }
-      );
-    } catch (err) {
-      console.error("Failed to save track to local collection in play endpoint:", err);
-    }
+      },
+      { upsert: true }
+    ).catch(() => {});
 
     // If authenticated, automatically write to user's Listening History as well
     if (userId) {

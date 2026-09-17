@@ -15,10 +15,35 @@ export class Logger {
   }
 }
 
-// Memory Cache fallback
-const memoryCache = new Map<string, { value: string; expiry: number }>();
+// High-performance L1 In-Memory LRU Cache (capped to avoid memory bloat)
+const MAX_L1_ENTRIES = 3000;
+const l1Cache = new Map<string, { value: any; expiry: number }>();
 
-// Cache Service with Redis and In-Memory fallback
+function setL1(key: string, value: any, ttlSeconds: number) {
+  if (l1Cache.size >= MAX_L1_ENTRIES) {
+    // Evict oldest 20% entries when capacity is reached
+    const keysToDelete = Array.from(l1Cache.keys()).slice(0, Math.floor(MAX_L1_ENTRIES * 0.2));
+    for (const k of keysToDelete) {
+      l1Cache.delete(k);
+    }
+  }
+  l1Cache.set(key, {
+    value,
+    expiry: Date.now() + Math.min(ttlSeconds, 600) * 1000,
+  });
+}
+
+function getL1<T>(key: string): T | null {
+  const item = l1Cache.get(key);
+  if (!item) return null;
+  if (Date.now() > item.expiry) {
+    l1Cache.delete(key);
+    return null;
+  }
+  return item.value as T;
+}
+
+// Cache Service with 2-Tier Caching (L1 RAM + L2 Redis)
 export class CacheService {
   private static redisClient: Redis | null = null;
   private static isConnected = false;
@@ -30,6 +55,7 @@ export class CacheService {
     try {
       this.redisClient = new Redis(url, {
         maxRetriesPerRequest: 1,
+        enableOfflineQueue: false,
         retryStrategy: (times) => {
           if (times > 3) {
             Logger.warn("Redis connection failed. Falling back to In-Memory cache.");
@@ -46,11 +72,9 @@ export class CacheService {
       });
 
       this.redisClient.on("error", (err) => {
-        Logger.error("Redis Error", err);
         this.isConnected = false;
       });
     } catch (error) {
-      Logger.error("Failed to initialize Redis client", error);
       this.isConnected = false;
     }
   }
@@ -63,61 +87,67 @@ export class CacheService {
   }
 
   static async get<T>(key: string): Promise<T | null> {
+    // 1. Fast L1 In-Memory lookup (0 network, 0 JSON.parse, < 0.001ms)
+    const memVal = getL1<T>(key);
+    if (memVal !== null) {
+      return memVal;
+    }
+
+    // 2. L2 Redis lookup
     const client = this.getClient();
     if (client && this.isConnected) {
       try {
         const val = await client.get(key);
-        return val ? JSON.parse(val) : null;
+        if (val) {
+          const parsed = JSON.parse(val) as T;
+          // Populate L1 cache for subsequent instant hits
+          setL1(key, parsed, 120);
+          return parsed;
+        }
       } catch (err) {
-        Logger.error(`Error getting key: ${key} from Redis`, err);
+        // Silently proceed on Redis failure
       }
     }
 
-    // In-Memory Fallback
-    const cached = memoryCache.get(key);
-    if (cached) {
-      if (Date.now() < cached.expiry) {
-        return JSON.parse(cached.value);
-      }
-      memoryCache.delete(key);
-    }
     return null;
   }
 
   static async set(key: string, value: any, ttlSeconds = 300): Promise<void> {
-    const client = this.getClient();
-    const serialized = JSON.stringify(value);
+    // Save to L1 memory cache instantly
+    setL1(key, value, ttlSeconds);
 
+    // Save to L2 Redis asynchronously
+    const client = this.getClient();
     if (client && this.isConnected) {
       try {
+        const serialized = JSON.stringify(value);
         await client.set(key, serialized, "EX", ttlSeconds);
-        return;
       } catch (err) {
-        Logger.error(`Error setting key: ${key} in Redis`, err);
+        // Silently proceed
       }
     }
-
-    // In-Memory Fallback
-    memoryCache.set(key, {
-      value: serialized,
-      expiry: Date.now() + ttlSeconds * 1000,
-    });
   }
 
   static async delete(key: string): Promise<void> {
+    l1Cache.delete(key);
+
     const client = this.getClient();
     if (client && this.isConnected) {
       try {
         await client.del(key);
-        return;
-      } catch (err) {
-        Logger.error(`Error deleting key: ${key} in Redis`, err);
-      }
+      } catch (err) {}
     }
-    memoryCache.delete(key);
   }
 
   static async clearPattern(pattern: string): Promise<void> {
+    // Clear L1 memory matching pattern
+    const regex = new RegExp(pattern.replace(/\*/g, ".*"));
+    for (const key of l1Cache.keys()) {
+      if (regex.test(key)) {
+        l1Cache.delete(key);
+      }
+    }
+
     const client = this.getClient();
     if (client && this.isConnected) {
       try {
@@ -125,18 +155,7 @@ export class CacheService {
         if (keys.length > 0) {
           await client.del(...keys);
         }
-        return;
-      } catch (err) {
-        Logger.error(`Error clearing pattern ${pattern} in Redis`, err);
-      }
-    }
-
-    // Clear memory cache keys matching pattern
-    const regex = new RegExp(pattern.replace(/\*/g, ".*"));
-    for (const key of memoryCache.keys()) {
-      if (regex.test(key)) {
-        memoryCache.delete(key);
-      }
+      } catch (err) {}
     }
   }
 }
