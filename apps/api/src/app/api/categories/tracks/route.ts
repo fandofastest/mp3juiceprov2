@@ -3,6 +3,7 @@ import { initApi, successResponse, errorResponse } from "../../../../lib/api-hel
 import { Category, Track, SystemSettings, AppConfig } from "@headless/database";
 import { ProviderFactory } from "@headless/providers";
 import { shouldEnforceSafeMode, isBlockedKeyword } from "../../../../lib/safe-mode-guard";
+import { trackAppHit } from "../../../../lib/hit-tracker";
 
 async function fetchJamendoCategoryTracks(query: string, limit = 20) {
   try {
@@ -32,6 +33,7 @@ async function fetchJamendoCategoryTracks(query: string, limit = 20) {
 export async function GET(req: NextRequest) {
   try {
     await initApi();
+    trackAppHit(req, "categories_tracks");
     const { searchParams } = new URL(req.url);
     const slug = searchParams.get("slug");
     const id = searchParams.get("id");
