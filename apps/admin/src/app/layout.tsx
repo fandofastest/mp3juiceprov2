@@ -20,7 +20,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     { name: "Users Directory", href: "/users", icon: UserIcon },
     { name: "Music Tracks", href: "/tracks", icon: Music },
     { name: "Play Hit Logs", href: "/play-logs", icon: ListMusic },
-    { name: "App Hit Stats", href: "/app-stats", icon: Activity },
+    { name: "App Visitor & Hits", href: "/app-stats", icon: Activity },
     { name: "Home Builder", href: "/builder", icon: Sliders },
     { name: "Categories", href: "/categories", icon: FolderHeart },
     { name: "Banners", href: "/banners", icon: Image },

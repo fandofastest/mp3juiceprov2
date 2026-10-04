@@ -2,10 +2,12 @@ import { NextRequest } from "next/server";
 import { initApi, successResponse, errorResponse, authenticateRequest, authorizeRoles } from "../../../lib/api-helper";
 import { Banner } from "@headless/database";
 import { BannerInputSchema } from "@headless/types";
+import { trackAppHit } from "../../../lib/hit-tracker";
 
 export async function GET(req: NextRequest) {
   try {
     await initApi();
+    trackAppHit(req, "banners");
     const banners = await Banner.find({ isDeleted: false }).sort({ sortOrder: 1 });
     return successResponse(banners);
   } catch (error: any) {

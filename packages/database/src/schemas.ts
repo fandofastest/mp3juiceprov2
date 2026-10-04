@@ -491,6 +491,7 @@ export interface IAppHitStatDocument extends Document {
   packageName: string;
   date: string; // YYYY-MM-DD
   totalHits: number;
+  uniqueVisitors: number;
   endpoints: Map<string, number>;
   lastHitAt: Date;
   createdAt: Date;
@@ -502,6 +503,7 @@ export const AppHitStatSchema = new Schema<IAppHitStatDocument>(
     packageName: { type: String, required: true, index: true },
     date: { type: String, required: true, index: true },
     totalHits: { type: Number, default: 0 },
+    uniqueVisitors: { type: Number, default: 0 },
     endpoints: { type: Schema.Types.Map, of: Number, default: {} },
     lastHitAt: { type: Date, default: Date.now },
   },

@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { initApi, successResponse, errorResponse, authenticateRequest, authorizeRoles } from "../../../../lib/api-helper";
 import { AppHitStat, AppConfig } from "@headless/database";
+import { getLiveVisitorStats } from "../../../../lib/hit-tracker";
 
 export async function GET(req: NextRequest) {
   try {
@@ -25,28 +26,45 @@ export async function GET(req: NextRequest) {
       matchQuery.packageName = packageNameFilter;
     }
 
-    // 1. Get all hit stats within range
+    // 1. Get all hit stats within range from MongoDB
     const rawStats = await AppHitStat.find(matchQuery).sort({ date: 1 });
 
-    // 2. Total platform hits in range
-    const totalHits = rawStats.reduce((sum, item) => sum + (item.totalHits || 0), 0);
+    // 2. Real-time Live & In-memory Visitor Counts
+    const liveStats = getLiveVisitorStats(5 * 60 * 1000); // 5 min active window
 
-    // 3. Today's hits
+    // 3. Platform aggregates
+    const totalHits = rawStats.reduce((sum, item) => sum + (item.totalHits || 0), 0);
+    const totalUniqueVisitors = rawStats.reduce((sum, item) => sum + (item.uniqueVisitors || 0), 0);
+
     const todayStr = new Date().toISOString().split("T")[0];
     const todayHits = rawStats
       .filter((s) => s.date === todayStr)
       .reduce((sum, item) => sum + (item.totalHits || 0), 0);
 
     // 4. Per App Summary
-    const appMap: Record<string, { packageName: string; totalHits: number; todayHits: number; lastHitAt: Date | null; endpoints: Record<string, number> }> = {};
+    interface AppSummary {
+      packageName: string;
+      totalHits: number;
+      todayHits: number;
+      todayVisitors: number;
+      liveVisitors: number;
+      hitsPerVisitor: number;
+      lastHitAt: Date | null;
+      endpoints: Record<string, number>;
+    }
 
-    // Get registered apps list for complete picture
+    const appMap: Record<string, AppSummary> = {};
+
+    // Seed registered apps list
     const registeredApps = await AppConfig.find({}).select("packageName");
     registeredApps.forEach((app) => {
       appMap[app.packageName] = {
         packageName: app.packageName,
         totalHits: 0,
         todayHits: 0,
+        todayVisitors: 0,
+        liveVisitors: 0,
+        hitsPerVisitor: 0,
         lastHitAt: null,
         endpoints: {},
       };
@@ -59,14 +77,19 @@ export async function GET(req: NextRequest) {
           packageName: pkg,
           totalHits: 0,
           todayHits: 0,
+          todayVisitors: 0,
+          liveVisitors: 0,
+          hitsPerVisitor: 0,
           lastHitAt: null,
           endpoints: {},
         };
       }
 
       appMap[pkg].totalHits += stat.totalHits || 0;
+
       if (stat.date === todayStr) {
         appMap[pkg].todayHits += stat.totalHits || 0;
+        appMap[pkg].todayVisitors += stat.uniqueVisitors || 0;
       }
 
       if (!appMap[pkg].lastHitAt || (stat.lastHitAt && new Date(stat.lastHitAt) > new Date(appMap[pkg].lastHitAt!))) {
@@ -87,7 +110,23 @@ export async function GET(req: NextRequest) {
       }
     });
 
-    const appSummaries = Object.values(appMap).sort((a, b) => b.totalHits - a.totalHits);
+    // Merge live visitor counts & instant memory today unique counts
+    for (const [pkg, appData] of Object.entries(appMap)) {
+      const liveCount = liveStats.perPackage[pkg] || 0;
+      const memTodayVisitors = liveStats.todayUniqueVisitors[pkg] || 0;
+
+      appData.liveVisitors = liveCount;
+      appData.todayVisitors = Math.max(appData.todayVisitors, memTodayVisitors, liveCount);
+      appData.hitsPerVisitor = appData.todayVisitors > 0 ? Number((appData.todayHits / appData.todayVisitors).toFixed(1)) : 0;
+    }
+
+    const appSummaries = Object.values(appMap).sort((a, b) => b.liveVisitors - a.liveVisitors || b.todayHits - a.todayHits);
+
+    // Calculate Platform Today Unique Visitors
+    const platformTodayVisitors = Math.max(
+      appSummaries.reduce((sum, a) => sum + a.todayVisitors, 0),
+      liveStats.totalLive
+    );
 
     // 5. Daily Trend Chart Data (Last N days)
     const datesList: string[] = [];
@@ -100,14 +139,26 @@ export async function GET(req: NextRequest) {
     const chartData = datesList.map((dStr) => {
       const dayStats = rawStats.filter((s) => s.date === dStr);
       const dayHits = dayStats.reduce((sum, item) => sum + (item.totalHits || 0), 0);
+      let dayVisitors = dayStats.reduce((sum, item) => sum + (item.uniqueVisitors || 0), 0);
+
+      if (dStr === todayStr) {
+        dayVisitors = Math.max(dayVisitors, platformTodayVisitors);
+      }
+
       const appBreakdown: Record<string, number> = {};
+      const appVisitorBreakdown: Record<string, number> = {};
+
       dayStats.forEach((s) => {
         appBreakdown[s.packageName] = (appBreakdown[s.packageName] || 0) + (s.totalHits || 0);
+        appVisitorBreakdown[s.packageName] = (appVisitorBreakdown[s.packageName] || 0) + (s.uniqueVisitors || 0);
       });
+
       return {
         date: dStr,
         totalHits: dayHits,
+        uniqueVisitors: dayVisitors,
         apps: appBreakdown,
+        appVisitors: appVisitorBreakdown,
       };
     });
 
@@ -115,6 +166,9 @@ export async function GET(req: NextRequest) {
       summary: {
         totalHits,
         todayHits,
+        totalLiveVisitors: liveStats.totalLive,
+        todayVisitors: platformTodayVisitors,
+        totalUniqueVisitors,
         totalApps: appSummaries.length,
       },
       apps: appSummaries,
